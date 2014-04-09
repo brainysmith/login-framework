@@ -76,6 +76,12 @@ class LoginContextImpl extends LoginContext {
   override def withParams(params: JObj): LoginContext = ???
 
   override def params: JObj = ???
+
+  /**
+   * Returns a string representation of this [[com.identityblitz.login.LoginContext]].
+   * @return - string representation of this [[com.identityblitz.login.LoginContext]].
+   */
+  def asString: String = ???
 }
 
 

@@ -1,9 +1,11 @@
 package com.identityblitz.login.glue.servlet;
 
 import com.identityblitz.login.LoginContext;
+import com.identityblitz.login.LoginContext$;
 import com.identityblitz.login.Platform;
 import com.identityblitz.login.error.TransportException;
 import com.identityblitz.login.transport.InboundTransport;
+import com.identityblitz.scs.SCSService;
 import scala.Enumeration;
 import scala.Option;
 import javax.servlet.ServletException;
@@ -77,7 +79,6 @@ public class APServlet extends HttpServlet {
 }
 
 class ServletInboundTransport implements InboundTransport {
-
     private final HttpServletRequest req;
     private final HttpServletResponse resp;
 
@@ -108,11 +109,15 @@ class ServletInboundTransport implements InboundTransport {
 
     @Override
     public Option<LoginContext> getLoginCtx() {
-        return null;
+        final String lc = SCSService.getSCS(req);
+        if(lc == null)
+            return null;
+        return Option.apply(LoginContext$.MODULE$.fromString(lc));
     }
 
     @Override
     public void updatedLoginCtx(LoginContext loginCtx) {
+        SCSService.changeSCS(req, loginCtx.asString());
     }
 
     @Override
