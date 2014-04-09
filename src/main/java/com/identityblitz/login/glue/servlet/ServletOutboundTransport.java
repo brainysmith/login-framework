@@ -19,7 +19,7 @@ class ServletOutboundTransport implements OutboundTransport {
     }
 
     @Override
-    public void sendRedirect(String location) throws TransportException {
+    public void redirect(String location) throws TransportException {
         try {
             resp.sendRedirect(location);
         } catch (IOException e) {

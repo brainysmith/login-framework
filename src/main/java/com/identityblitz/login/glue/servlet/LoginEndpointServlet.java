@@ -16,7 +16,7 @@ import java.io.IOException;
 @WebServlet("/login")
 public final class LoginEndpointServlet extends HttpServlet {
 
-    private static final String REDIRECT_URI_PARAM_NAME = "redirect_uri";
+    private static final String CALLBACK_URI_PARAM_NAME = "callback_uri";
     private static final String METHOD_PARAM_NAME = "method";
 
     private static final String LC_ATTR_NAME = "loginContext";
@@ -27,11 +27,11 @@ public final class LoginEndpointServlet extends HttpServlet {
         final String method;
         switch (req.getDispatcherType()) {
             case REQUEST:
-                redirectUri = req.getParameter(REDIRECT_URI_PARAM_NAME);
+                redirectUri = req.getParameter(CALLBACK_URI_PARAM_NAME);
                 method = req.getParameter(METHOD_PARAM_NAME);
                 break;
             case FORWARD:
-                redirectUri = (String) req.getAttribute(REDIRECT_URI_PARAM_NAME);
+                redirectUri = (String) req.getAttribute(CALLBACK_URI_PARAM_NAME);
                 method = (String) req.getAttribute(METHOD_PARAM_NAME);
                 break;
             default:

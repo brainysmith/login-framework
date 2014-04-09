@@ -52,6 +52,13 @@ trait LoginContext {
    * @return the current login context.
    */
   def withParams(params: JObj): LoginContext
+
+  /**
+   * Returns a string representation of this [[com.identityblitz.login.LoginContext]].
+   * @return - string representation of this [[com.identityblitz.login.LoginContext]].
+   */
+  def asString: String
+
 }
 
 class LoginContextImpl extends LoginContext {
@@ -75,5 +82,12 @@ class LoginContextImpl extends LoginContext {
 object LoginContext {
 
   def apply(redirectUri: String): LoginContext = ???
+
+  /**
+   * Creates [[com.identityblitz.login.LoginContext]]] from string representation.
+   * @param str - string representation of [[com.identityblitz.login.LoginContext]]].
+   * @return - login context.
+   */
+  def fromString(str: String) :LoginContext = ???
 
 }
