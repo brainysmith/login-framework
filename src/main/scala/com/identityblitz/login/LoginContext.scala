@@ -2,6 +2,10 @@ package com.identityblitz.login
 
 import com.identityblitz.json.{JWriter, JObj}
 import com.identityblitz.login.transport.InboundTransport
+import com.identityblitz.login.authn.AuthnMethods._
+import com.identityblitz.login.FlowAttrName._
+import com.identityblitz.login.LoggingUtils._
+import com.identityblitz.login.error.LoginException
 
 /**
  */
@@ -88,8 +92,26 @@ class LoginContextImpl extends LoginContext {
 
 object LoginContext {
 
+  private val defaultAuthnMethod = authnMethodsMap.get("default").map(_.name)
+
   def apply(method: String, callbackUri: String): LoginContext = ???
 
+  def apply(iTr: InboundTransport): LoginContext = {
+    val method = Option(iTr.getAttribute(AUTHN_METHOD_NAME).asInstanceOf[String]).orElse(defaultAuthnMethod).getOrElse({
+      logger.error("A default login method not specified in the configuration. To fix this fix add a parameter " +
+        "'default = true' to an one authentication method")
+      throw new LoginException("A default login method not specified in the configuration. To fix this fix add a" +
+        " parameter 'default = true' to an one authentication method")
+    })
+
+    val callbackUri = Option(iTr.getAttribute(CALLBACK_URI_NAME).asInstanceOf[String]).getOrElse({
+      logger.error("parameter {} not found in the inbound transport", CALLBACK_URI_NAME)
+      throw new LoginException(s"parameter $CALLBACK_URI_NAME not found in the inbound transport")
+    })
+
+    apply(method, callbackUri)
+  }  
+  
   /**
    * Creates [[com.identityblitz.login.LoginContext]]] from string representation.
    * @param str - string representation of [[com.identityblitz.login.LoginContext]]].
