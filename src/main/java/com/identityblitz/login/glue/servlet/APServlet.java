@@ -2,6 +2,7 @@ package com.identityblitz.login.glue.servlet;
 
 import com.identityblitz.login.*;
 import com.identityblitz.login.authn.AuthnMethod;
+import com.identityblitz.login.authn.AuthnMethods$;
 import com.identityblitz.login.error.LoginException;
 import com.identityblitz.login.error.TransportException;
 import com.identityblitz.login.transport.InboundTransport;
@@ -9,6 +10,12 @@ import com.identityblitz.login.transport.OutboundTransport;
 import com.identityblitz.scs.SCSService;
 import scala.Enumeration;
 import scala.Option;
+import scala.collection.JavaConversions;
+import scala.collection.JavaConverters;
+import scala.collection.convert.WrapAsJava;
+import scala.collection.convert.WrapAsJava$;
+import scala.collection.convert.Wrappers;
+
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
@@ -16,6 +23,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -64,7 +72,15 @@ public class APServlet extends HttpServlet {
 
     @Override
     public void init() throws ServletException {
-        handlers = Collections.emptyMap();
+        handlers = new HashMap<String, Handler>(AuthnMethods$.MODULE$.authnMethodsMap().size() + 1);
+
+        for(Map.Entry<String, AuthnMethod> entry : WrapAsJava$.MODULE$.mapAsJavaMap(
+                AuthnMethods$.MODULE$.authnMethodsMap()).entrySet()) {
+            handlers.put(entry.getKey(), entry.getValue());
+        }
+
+
+
     }
 
     @Override
