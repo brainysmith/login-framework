@@ -33,7 +33,7 @@ object LoginManager {
     this.getClass.getClassLoader.loadClass(className).asInstanceOf[LoginFlow]
   })
 
-  def start(redirectUri: String)(method: String)(implicit req: InboundTransport, resp: OutboundTransport) = {
+  def start(method: String)(implicit req: InboundTransport, resp: OutboundTransport) = {
     /**todo:
       * 1) check that input parameters is correct;
       * 2) create a new login context;

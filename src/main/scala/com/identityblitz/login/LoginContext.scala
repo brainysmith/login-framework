@@ -6,6 +6,10 @@ import com.identityblitz.json.{JWriter, JObj}
  */
 trait LoginContext {
 
+  /**
+   * 
+   * @return
+   */
   def redirectUri: String
   
   /**
@@ -19,7 +23,7 @@ trait LoginContext {
    *
    * @return
    */
-  def curMethod: String
+  def method: String
 
   /**
    * Defines login methods that have been successfully completed.
@@ -56,20 +60,20 @@ class LoginContextImpl extends LoginContext {
 
   override def status: Int = ???
 
+  override def method: String = ???
 
-
-  override def withParams(params: JObj): LoginContext = ???
+  override def completedMethods: Array[String] = ???
 
   override def withParam[T](param: (String, T))(implicit writer: JWriter[T]): LoginContext = ???
 
-  override def params: JObj = ???
+  override def withParams(params: JObj): LoginContext = ???
 
-  override def completedMethods: Array[String] = ???
+  override def params: JObj = ???
 }
 
 
 object LoginContext {
 
-  def apply(): LoginContext = ???
+  def apply(redirectUri: String): LoginContext = ???
 
 }

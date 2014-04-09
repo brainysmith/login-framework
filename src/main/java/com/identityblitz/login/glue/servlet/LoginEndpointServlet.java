@@ -1,6 +1,6 @@
 package com.identityblitz.login.glue.servlet;
 
-import com.identityblitz.login.LoginManager;
+import com.identityblitz.login.LoginContext$;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -8,43 +8,38 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Initialize a new login process by creating a new login context and forward to login servlet.
+ * Created login context is added to the current request.
  */
 @WebServlet("/login")
 public final class LoginEndpointServlet extends HttpServlet {
 
     private static final String REDIRECT_URI_PARAM_NAME = "redirect_uri";
+    private static final String METHOD_PARAM_NAME = "method";
+
+    private static final String LC_ATTR_NAME = "loginContext";
 
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         final String redirectUri;
+        final String method;
         switch (req.getDispatcherType()) {
             case REQUEST:
                 redirectUri = req.getParameter(REDIRECT_URI_PARAM_NAME);
+                method = req.getParameter(METHOD_PARAM_NAME);
                 break;
             case FORWARD:
                 redirectUri = (String) req.getAttribute(REDIRECT_URI_PARAM_NAME);
+                method = (String) req.getAttribute(METHOD_PARAM_NAME);
                 break;
             default:
                 throw new UnsupportedOperationException("Unsupported dispatcher type: " + req.getDispatcherType());
         }
 
-        final Matcher matcher = pattern.matcher(req.getServletPath());
-        if (matcher.find()) {
-            final String method = matcher.group(1);
-
-
-        } else {
-            throw new IllegalStateException("No matches for url: " + req.getServletPath());
-        }
-
-
-        req.getRequestURI();
-        LoginManager.start(redirectUri, new ServletInboundTransport(req, resp), new ServletOutboundTransport(resp));
+        req.setAttribute(LC_ATTR_NAME, LoginContext$.MODULE$.apply(redirectUri));
+        req.getRequestDispatcher("/login/" + method).forward(req, resp);
     }
 
 }

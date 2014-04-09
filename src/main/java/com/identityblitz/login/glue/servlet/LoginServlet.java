@@ -12,7 +12,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Initialize a new login process.
+ *
  */
 
 @WebServlet("/login/*")
@@ -22,18 +22,13 @@ public final class LoginServlet extends HttpServlet {
 
     @Override
     protected void service(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        final Matcher matcher = pattern.matcher(req.getServletPath());
+        final Matcher matcher = pattern.matcher(req.getRequestURI());
         if (matcher.find()) {
             final String method = matcher.group(1);
-
-
+            LoginManager.start(method, new ServletInboundTransport(req, resp), new ServletOutboundTransport(resp));
         } else {
             throw new IllegalStateException("No matches for url: " + req.getServletPath());
         }
-
-
-        req.getRequestURI();
-        LoginManager.start(redirectUri, new ServletInboundTransport(req, resp), new ServletOutboundTransport(resp));
     }
 
 }
