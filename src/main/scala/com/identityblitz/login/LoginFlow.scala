@@ -2,7 +2,7 @@ package com.identityblitz.login
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.buildin.BuildInLoginFlow
+import com.identityblitz.login.builtin.BuildInLoginFlow
 
 
 /**
