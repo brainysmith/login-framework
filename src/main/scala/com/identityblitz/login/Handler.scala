@@ -8,4 +8,7 @@ trait Handler {
   @throws(classOf[LoginException])
   def start(itr: InboundTransport, otr: OutboundTransport)
 
+  @throws(classOf[LoginException])
+  def `do`(itr: InboundTransport, otr: OutboundTransport)
+
 }

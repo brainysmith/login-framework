@@ -8,4 +8,8 @@ object FlowAttrName {
 
   val AUTHN_METHOD_NAME = "authn_method"
 
+  val ACTION = "action"
+
+  val HTTP_METHOD = "http_method"
+
 }

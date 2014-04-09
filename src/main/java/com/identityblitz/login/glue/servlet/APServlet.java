@@ -1,8 +1,7 @@
 package com.identityblitz.login.glue.servlet;
 
-import com.identityblitz.login.LoginContext;
-import com.identityblitz.login.LoginContext$;
-import com.identityblitz.login.Platform;
+import com.identityblitz.login.*;
+import com.identityblitz.login.error.LoginException;
 import com.identityblitz.login.error.TransportException;
 import com.identityblitz.login.transport.InboundTransport;
 import com.identityblitz.login.transport.OutboundTransport;
@@ -10,10 +9,15 @@ import com.identityblitz.scs.SCSService;
 import scala.Enumeration;
 import scala.Option;
 import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import static com.identityblitz.login.LoggingUtils.*;
 
 /**
@@ -50,33 +54,76 @@ import static com.identityblitz.login.LoggingUtils.*;
  *    </tbody>
  * </table>
  */
+
+@WebServlet("/login/*")
 public class APServlet extends HttpServlet {
+    private static final Pattern pattern = Pattern.compile("login/([^/]+)(/do)?", Pattern.CASE_INSENSITIVE);
+
+    private Map<String, Handler> handlers;
+
+    @Override
+    public void init() throws ServletException {
+        handlers = Collections.emptyMap();
+    }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        final String callWay = checkDispatchType(req);
-
-
+        final InboundTransport itr = new ServletInboundTransport(req, resp);
+        final OutboundTransport otr = new ServletOutboundTransport(resp);
+        extractParameters(itr);
+        itr.setAttribute(FlowAttrName$.MODULE$.HTTP_METHOD(), "GET");
+        invokeHandler(itr, otr);
     }
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        final String callWay = checkDispatchType(req);
-
         final InboundTransport itr = new ServletInboundTransport(req, resp);
         final OutboundTransport otr = new ServletOutboundTransport(resp);
-
-
+        extractParameters(itr);
+        itr.setAttribute(FlowAttrName$.MODULE$.HTTP_METHOD(), "POST");
+        invokeHandler(itr, otr);
     }
 
-    private String checkDispatchType(HttpServletRequest req) {
+    private void extractParameters(InboundTransport itr) {
+        final HttpServletRequest req = (HttpServletRequest)itr.unwrap();
+
         switch (req.getDispatcherType()) {
             case REQUEST:
+                itr.setAttribute(FlowAttrName$.MODULE$.CALLBACK_URI_NAME(),
+                        req.getParameter(FlowAttrName$.MODULE$.CALLBACK_URI_NAME()));
+                itr.setAttribute(FlowAttrName$.MODULE$.AUTHN_METHOD_NAME(),
+                        req.getParameter(FlowAttrName$.MODULE$.AUTHN_METHOD_NAME()));
+                break;
             case FORWARD:
-                return req.getDispatcherType().name();
+                break;
             default:
                 throw new UnsupportedOperationException("Unsupported dispatcher type: " + req.getDispatcherType());
         }
+    }
+
+    private void invokeHandler(final InboundTransport itr, final OutboundTransport otr)
+            throws ServletException {
+        final HttpServletRequest req = (HttpServletRequest)itr.unwrap();
+        final Matcher matcher = pattern.matcher(req.getRequestURI());
+        if (matcher.find()) {
+            final String method = matcher.group(1);
+            final String action = matcher.group(2);
+
+            try {
+                if ("/do".equalsIgnoreCase(action)) {
+                    handlers.get(method)._mthdo(itr, otr);
+                } else {
+                    handlers.get(method).start(itr, otr);
+                }
+            }
+            catch (LoginException e) {
+                throw new ServletException(e);
+            }
+
+        } else {
+            throw new IllegalStateException("No matches for url: " + req.getServletPath());
+        }
+
     }
 
 }
