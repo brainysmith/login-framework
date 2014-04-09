@@ -1,31 +1,55 @@
 package com.identityblitz.login.glue.servlet;
 
+import com.identityblitz.lang.java.ToScalaConverter;
+import com.identityblitz.login.error.TransportException;
 import com.identityblitz.login.transport.InboundTransport;
 import scala.Option;
 import scala.collection.immutable.Map;
 
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+import static com.identityblitz.login.LoggingUtils.logger;
+
 /**
- * Created by szaytsev on 4/7/14.
- */
-public class ServletInboundTransport implements InboundTransport {
+  */
+class ServletInboundTransport implements InboundTransport {
+
+    private final HttpServletRequest req;
+    private final HttpServletResponse resp;
+
+    ServletInboundTransport(final HttpServletRequest req, final HttpServletResponse resp) {
+        this.req = req;
+        this.resp = resp;
+    }
 
     @Override
     public Option<String> getParameter(String name) {
-        return null;
+        return Option.apply(req.getParameter(name));
     }
 
     @Override
     public Map<String, String[]> getParameterMap() {
-        return null;
-    }
-
-    @Override
-    public void forward() {
-
+        return ToScalaConverter.toScalaImmMap(req.getParameterMap());
     }
 
     @Override
     public Object unwrap() {
-        return null;
+        return req;
+    }
+
+    @Override
+    public void forward(String path) throws TransportException {
+        try {
+            req.getRequestDispatcher(path).forward(req, resp);
+        } catch (ServletException e) {
+            logger().error("Can't forward [path = {}]. ServletException has occurred: {}", path, e);
+            throw new TransportException(e);
+        } catch (IOException e) {
+            logger().error("Can't forward [path = {}]. IOException has occurred: {}", path, e);
+            throw new TransportException(e);
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.identityblitz.lang.scala
 
+import scala.language.reflectiveCalls
+
 /**
  *
  */

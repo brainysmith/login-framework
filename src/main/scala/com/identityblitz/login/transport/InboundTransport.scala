@@ -1,5 +1,7 @@
 package com.identityblitz.login.transport
 
+import com.identityblitz.login.error.TransportException
+
 /**
  */
 trait InboundTransport {
@@ -8,7 +10,8 @@ trait InboundTransport {
 
   def getParameterMap: Map[String, Array[String]]
 
-  def forward
+  @throws(classOf[TransportException])
+  def forward(path: String)
 
   def unwrap: AnyRef
 }
