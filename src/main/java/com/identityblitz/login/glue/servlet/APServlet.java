@@ -5,6 +5,7 @@ import com.identityblitz.login.LoginContext$;
 import com.identityblitz.login.Platform;
 import com.identityblitz.login.error.TransportException;
 import com.identityblitz.login.transport.InboundTransport;
+import com.identityblitz.login.transport.OutboundTransport;
 import com.identityblitz.scs.SCSService;
 import scala.Enumeration;
 import scala.Option;
@@ -62,6 +63,8 @@ public class APServlet extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         final String callWay = checkDispatchType(req);
 
+        final InboundTransport itr = new ServletInboundTransport(req, resp);
+        final OutboundTransport otr = new ServletOutboundTransport(resp);
 
 
     }
@@ -141,5 +144,33 @@ class ServletInboundTransport implements InboundTransport {
             logger().error("Can't forward [path = {}]. IOException has occurred: {}", path, e);
             throw new TransportException(e);
         }
+    }
+}
+
+class ServletOutboundTransport implements OutboundTransport {
+    private final HttpServletResponse resp;
+
+    ServletOutboundTransport(final HttpServletResponse resp) {
+        this.resp = resp;
+    }
+
+    @Override
+    public void redirect(String location) throws TransportException {
+        try {
+            resp.sendRedirect(location);
+        } catch (IOException e) {
+            logger().error("Can't send redirect [location = {}]. IOException has occurred: {}", location, e);
+            throw new TransportException(e);
+        }
+    }
+
+    @Override
+    public Object unwrap() {
+        return resp;
+    }
+
+    @Override
+    public Enumeration.Value platform() {
+        return Platform.SERVLET();
     }
 }
