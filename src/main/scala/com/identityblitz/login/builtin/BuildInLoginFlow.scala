@@ -1,4 +1,4 @@
-package com.identityblitz.login.buildin
+package com.identityblitz.login.builtin
 
 import com.identityblitz.login.{LoginContext, LoginFlow}
 
