@@ -38,6 +38,7 @@ public final class LoginEndpointServlet extends HttpServlet {
                 throw new UnsupportedOperationException("Unsupported dispatcher type: " + req.getDispatcherType());
         }
 
+        /**todo: thinking how can be used login flow in this point**/
         req.setAttribute(LC_ATTR_NAME, LoginContext$.MODULE$.apply(redirectUri));
         req.getRequestDispatcher("/login/" + method).forward(req, resp);
     }

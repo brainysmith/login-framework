@@ -1,6 +1,6 @@
 package com.identityblitz.login.glue.servlet;
 
-import com.identityblitz.login.LoginManager;
+import com.identityblitz.login.LoginFlow$;
 import com.identityblitz.login.transport.InboundTransport;
 import com.identityblitz.login.transport.OutboundTransport;
 
@@ -32,10 +32,10 @@ public final class LoginServlet extends HttpServlet {
             final OutboundTransport outTransport = new ServletOutboundTransport(resp);
             if ("do".equalsIgnoreCase(action)) {
                 /** do action **/
-                LoginManager._mthdo(inTransport, outTransport);
+                LoginFlow$.MODULE$.apply().next(inTransport, outTransport);
             } else {
                 /** start action **/
-                LoginManager.start(method, inTransport, outTransport);
+                LoginFlow$.MODULE$.apply().start(method, inTransport, outTransport);
             }
         } else {
             throw new IllegalStateException("No matches for url: " + req.getServletPath());

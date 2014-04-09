@@ -20,8 +20,8 @@ trait LoginContext {
   def status: Int
 
   /**
-   *
-   * @return
+   * Defines the current processing authentication method.
+   * @return the current authentication method
    */
   def method: String
 
