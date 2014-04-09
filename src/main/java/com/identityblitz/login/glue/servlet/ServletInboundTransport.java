@@ -1,6 +1,7 @@
 package com.identityblitz.login.glue.servlet;
 
 import com.identityblitz.lang.java.ToScalaConverter;
+import com.identityblitz.login.LoginContext;
 import com.identityblitz.login.error.TransportException;
 import com.identityblitz.login.transport.InboundTransport;
 import scala.Option;
@@ -19,10 +20,18 @@ class ServletInboundTransport implements InboundTransport {
 
     private final HttpServletRequest req;
     private final HttpServletResponse resp;
+    private final LoginContext lc;
 
     ServletInboundTransport(final HttpServletRequest req, final HttpServletResponse resp) {
         this.req = req;
         this.resp = resp;
+        //todo: do it
+        this.lc = null;
+    }
+
+    @Override
+    public LoginContext getLoginContext() {
+        return lc;
     }
 
     @Override
