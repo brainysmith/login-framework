@@ -37,11 +37,19 @@ abstract class LoginFlow {
     )
 
   protected def crtLc(implicit iTr: InboundTransport) = {
-/*    Option(iTr.getAttribute(AUTHN_METHOD_NAME)).orElse(authnMethodsMap.get("default")).fold({
-      logger.error("a default login method not specified")
-    })
+    val method = Option(iTr.getAttribute(AUTHN_METHOD_NAME)).orElse(authnMethodsMap.get("default")).orElse({
+      logger.error("A default login method not specified in the configuration. To fix this fix add a parameter " +
+        "'default = true' to an one authentication method")
+      throw new LoginException("A default login method not specified in the configuration. To fix this fix add a" +
+        " parameter 'default = true' to an one authentication method")
+    }).get
 
-    LoginContext()*/
+    val callbackUri = Option(iTr.getAttribute(CALLBACK_URI_NAME)).orElse({
+      logger.error("parameter {} not found in the inbound transport", CALLBACK_URI_NAME)
+      throw new LoginException(s"parameter $CALLBACK_URI_NAME not found in the inbound transport")
+    }).get
+
+/*    LoginContext(method, callbackUri)*/
   }
 
   def start(implicit iTr: InboundTransport, oTr: OutboundTransport) =

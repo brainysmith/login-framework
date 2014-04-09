@@ -87,9 +87,8 @@ class LoginContextImpl extends LoginContext {
 
 
 object LoginContext {
-  import com.identityblitz.login.FlowAttrName._
 
-  def apply(method: String, redirectUri: String): LoginContext = ???
+  def apply(method: String, callbackUri: String): LoginContext = ???
 
   /**
    * Creates [[com.identityblitz.login.LoginContext]]] from string representation.
