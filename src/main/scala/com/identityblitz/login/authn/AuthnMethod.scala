@@ -1,10 +1,12 @@
 package com.identityblitz.login.authn
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
+import com.identityblitz.login.Handler
+import com.identityblitz.login.error.LoginException
 
 /**
   */
-trait AuthnMethod {
+trait AuthnMethod extends Handler {
 
   /**
    * The name of the authentication method.
@@ -19,6 +21,7 @@ trait AuthnMethod {
    * @param req
    * @param resp
    */
+  @throws(classOf[LoginException])
   def start(implicit req: InboundTransport, resp: OutboundTransport)
 
 
@@ -29,7 +32,8 @@ trait AuthnMethod {
    * @param req
    * @param resp
    */
-  def `do`(implicit req: InboundTransport, resp: OutboundTransport): Int
+  @throws(classOf[LoginException])
+  def DO(implicit req: InboundTransport, resp: OutboundTransport): Int
 
 }
 

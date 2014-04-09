@@ -1,6 +1,7 @@
 package com.identityblitz.login.glue.servlet;
 
 import com.identityblitz.login.*;
+import com.identityblitz.login.authn.AuthnMethod;
 import com.identityblitz.login.error.LoginException;
 import com.identityblitz.login.error.TransportException;
 import com.identityblitz.login.transport.InboundTransport;
@@ -111,7 +112,7 @@ public class APServlet extends HttpServlet {
 
             try {
                 if ("/do".equalsIgnoreCase(action)) {
-                    handlers.get(method)._mthdo(itr, otr);
+                    ((AuthnMethod)handlers.get(method)).DO(itr, otr);
                 } else {
                     handlers.get(method).start(itr, otr);
                 }
