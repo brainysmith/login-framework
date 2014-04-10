@@ -1,6 +1,6 @@
 package com.identityblitz.login.builtin
 
-import com.identityblitz.login.{LoginContext, LoginFlow}
+import com.identityblitz.login.LoginFlow
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 
 
@@ -9,7 +9,9 @@ import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
  */
 object BuiltInLoginFlow extends LoginFlow {
 
-  override protected def nextForFail(cause: String)(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = ???
+  override protected def nextForFail(cause: String)(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
+    endWithError(cause)
+  }
 
-  override protected def nextForSuccess(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = ???
+  override protected def nextForSuccess(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = endWithSuccess
 }
