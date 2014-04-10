@@ -33,19 +33,6 @@ trait AuthnMethod extends Handler {
    * @param resp
    */
   @throws(classOf[LoginException])
-  def DO(implicit req: InboundTransport, resp: OutboundTransport): Int
-
-}
-
-/**
- */
-//todo: thinking about it
-object AuthnResult {
-
-  val SUCCESS = 0
-
-  val FAIL = -1
-
-  val PROCESSING = 1
+  def DO(implicit req: InboundTransport, resp: OutboundTransport)
 
 }
