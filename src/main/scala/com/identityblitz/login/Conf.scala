@@ -13,7 +13,7 @@ object Conf {
 
   val loginFlow = confService.getOptString("loginFlow")
 
-  val authnMethods = confService.getDeepMapString("authnMethod")
+  val authnMethods = confService.getDeepMapString("authnMethods")
 
 }
 
