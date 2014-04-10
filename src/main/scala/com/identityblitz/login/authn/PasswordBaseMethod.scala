@@ -32,7 +32,7 @@ class PasswordBaseMethod(private val options: Map[String, String]) extends Authn
           req.forward(loginPage)
         }
       case _ =>
-        logger.debug("login or password not found")
+        logger.debug("parameter login or password not specified")
         //todo: thinking about error
         req.setAttribute("error", NO_CREDENTIALS_FOUND)
         req.forward(loginPage)
