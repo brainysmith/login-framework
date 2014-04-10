@@ -68,6 +68,7 @@ abstract class LoginFlow extends Handler {
     val lc = iTr.getLoginCtx.get
     logger.trace("An authentication method {} has been completed successfully. Getting a nex point ...", method)
     lc.asInstanceOf[LoginContextImpl].addCompletedMethod(method)
+    iTr.updatedLoginCtx(lc) //todo: temporary
     nextForSuccess
   }
 
