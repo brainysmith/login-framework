@@ -18,7 +18,7 @@ class PasswordBaseMethod(private val options: Map[String, String]) extends Authn
 
   override val name: String = "pswd"
 
-  override def start(implicit req: InboundTransport, resp: OutboundTransport): Unit = {} //do nothing
+  override def start(implicit req: InboundTransport, resp: OutboundTransport): Unit = req.forward(loginPage)
 
   override def DO(implicit req: InboundTransport, resp: OutboundTransport): Unit = {
     logger.trace("Try to authenticate by {}", name)
