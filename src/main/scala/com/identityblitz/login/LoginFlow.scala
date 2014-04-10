@@ -33,19 +33,19 @@ abstract class LoginFlow extends Handler {
   final def start(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     if (iTr.getLoginCtx.isEmpty) {
       logger.trace("Starting a new login flow")
-      val callbackUri = iTr.getAttribute(CALLBACK_URI_NAME).getOrElse[String]({
+      val callbackUri = iTr.getAttribute(CALLBACK_URI_NAME).getOrElse({
         logger.error("Parameter {} not found in the inbound transport", CALLBACK_URI_NAME)
         throw new LoginException(s"Parameter $CALLBACK_URI_NAME not found in the inbound transport")
-      })
+      }).asInstanceOf[String]
       iTr.updatedLoginCtx(LoginContext(callbackUri))
     }
 
-    val method = iTr.getAttribute(AUTHN_METHOD_NAME).orElse(defaultAuthnMethod).getOrElse[String]({
+    val method = iTr.getAttribute(AUTHN_METHOD_NAME).orElse(defaultAuthnMethod).getOrElse({
       logger.error("A default login method not specified in the configuration. To fix this fix add a parameter " +
         "'default = true' to an one authentication method")
       throw new LoginException("A default login method not specified in the configuration. To fix this fix add a" +
         " parameter 'default = true' to an one authentication method")
-    })
+    }).asInstanceOf[String]
 
     logger.debug("Starting a new authentication method: {}", method)
     authnMethodsMap.get(method).map(_.start).orElse({
