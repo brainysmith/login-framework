@@ -9,6 +9,4 @@ import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
  */
 object BuiltInLoginFlow extends LoginFlow {
 
-  //todo: realise it
-  override def next(implicit req: InboundTransport, resp: OutboundTransport): Option[String] = ???
 }
