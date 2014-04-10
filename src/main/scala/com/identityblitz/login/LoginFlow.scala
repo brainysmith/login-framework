@@ -2,7 +2,6 @@ package com.identityblitz.login
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.builtin.BuiltInLoginFlow
 import scala.annotation.implicitNotFound
 import com.identityblitz.login.authn.AuthnMethods._
 import com.identityblitz.login.error.LoginException
@@ -149,4 +148,13 @@ object LoginFlow {
 
   def apply() = loginFlow
 
+}
+
+private[login] object BuiltInLoginFlow extends LoginFlow {
+
+  override protected def nextForFail(cause: String)(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
+    endWithError(cause)
+  }
+
+  override protected def nextForSuccess(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = endWithSuccess
 }
