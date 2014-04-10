@@ -93,7 +93,7 @@ abstract class LoginFlow extends Handler {
    * @param iTr - inbound transport
    * @param oTr - outbound transport
    */
-  final def endWithSuccess(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+  final protected def endWithSuccess(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     logger.debug("The login flow complete successfully redirect to the following callback url: {}",
       iTr.getLoginCtx.get.callbackUri)
     //todo: add the result of the login flow
@@ -107,7 +107,7 @@ abstract class LoginFlow extends Handler {
    * @param iTr - inbound transport
    * @param oTr - outbound transport
    */
-  final def endWithError(cause: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+  final protected def endWithError(cause: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     logger.debug("The login flow complete with error [{}] redirect to the following callback url: {}",
       cause, iTr.getLoginCtx.get.callbackUri)
     //todo: add the error to the result

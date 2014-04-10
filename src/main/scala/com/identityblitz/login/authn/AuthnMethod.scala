@@ -5,6 +5,8 @@ import com.identityblitz.login.Handler
 import com.identityblitz.login.error.LoginException
 
 /**
+ *
+ * important: an implementation must have the constructor with following signature ''(options: Map[String, String])''.
   */
 trait AuthnMethod extends Handler {
 
