@@ -13,7 +13,7 @@ import com.identityblitz.login.FlowAttrName._
  * The implementation must be a singleton.
  */
 @implicitNotFound("No implicit inbound or outbound found.")
-abstract class LoginFlow {
+abstract class LoginFlow extends Handler {
 
   private val authnMethodsMeta = 
     (for ((clazz, params) <- Conf.authnMethods) yield AuthnMethodMeta(clazz, params)).toArray
@@ -52,7 +52,7 @@ abstract class LoginFlow {
 /*    LoginContext(method, callbackUri)*/
   }
 
-  def start(implicit iTr: InboundTransport, oTr: OutboundTransport) =
+  override def start(implicit iTr: InboundTransport, oTr: OutboundTransport) =
     (Option(iTr), Option(oTr)) match {
       case (Some(_), Some(_)) =>
         logger.trace("starting a new login flow")

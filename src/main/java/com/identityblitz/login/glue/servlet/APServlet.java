@@ -78,9 +78,7 @@ public class APServlet extends HttpServlet {
                 AuthnMethods$.MODULE$.authnMethodsMap()).entrySet()) {
             handlers.put(entry.getKey(), entry.getValue());
         }
-
-
-
+        handlers.put("flow", LoginFlow.apply());
     }
 
     @Override
