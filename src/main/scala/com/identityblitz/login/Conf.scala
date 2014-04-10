@@ -50,7 +50,7 @@ object AttrMeta {
       })
     }).joinRight match {
       case Left(err) => {
-        logger.error("can't parse attrMeta [error = {}, json = {}]", err, v.toJson)
+        logger.error("can't parse attrMeta [error = {}, json = {}]", Seq(err, v.toJson))
         throw new IllegalArgumentException("can't parse attrMeta")
       }
       case Right(seq) => {

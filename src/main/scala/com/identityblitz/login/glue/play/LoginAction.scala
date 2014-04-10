@@ -1,8 +1,12 @@
 package com.identityblitz.login.glue.play
 
-/**
- * todo: do it
- */
-class LoginAction {
+import play.api.mvc.{Action, Controller}
+
+object LoginController extends Controller {
+
+  def login = Action {
+
+    Ok("OK!")
+  }
 
 }
