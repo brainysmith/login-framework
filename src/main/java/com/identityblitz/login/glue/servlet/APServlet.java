@@ -9,6 +9,8 @@ import com.identityblitz.login.transport.InboundTransport;
 import com.identityblitz.login.transport.OutboundTransport;
 import com.identityblitz.scs.SCSService;
 import scala.Enumeration;
+import scala.None;
+import scala.None$;
 import scala.Option;
 import scala.collection.JavaConversions;
 import scala.collection.JavaConverters;
@@ -176,7 +178,7 @@ class ServletInboundTransport implements InboundTransport {
     public Option<LoginContext> getLoginCtx() {
         final String lc = SCSService.getSCS(req);
         if(lc == null)
-            return null;
+            return Option.empty();
         return Option.apply(LoginContext$.MODULE$.fromString(lc));
     }
 
