@@ -1,11 +1,6 @@
 package com.identityblitz.login
 
 import com.identityblitz.json.{JWriter, JObj}
-import com.identityblitz.login.transport.InboundTransport
-import com.identityblitz.login.authn.AuthnMethods._
-import com.identityblitz.login.FlowAttrName._
-import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.error.LoginException
 
 /**
  */
@@ -15,26 +10,20 @@ trait LoginContext {
    * 
    * @return
    */
-  def redirectUri: String
+  def callbackUri: String
   
-  /**
-   * Defines the current status of the login process.
-   * See the possible statuses in [[LoginStatus]].
-   * @return the current status of the login process.
-   */
-  def status: Int
-
-  /**
-   * Defines the current processing authentication method.
-   * @return the current authentication method
-   */
-  def method: String
-
   /**
    * Defines login methods that have been successfully completed.
    * @return array of login methods that have been successfully completed.
    */
   def completedMethods: Array[String]
+
+  /**
+   * Adds a specified authentication method to the methods which has already been completed successfully.
+   * @param method - a name of the authentication method which has been completed.
+   * @return updated login context.
+   */
+  def addCompletedMethod(method: String): LoginContext
 
   /**
    * Defines the parameters associated with the current login process.
@@ -68,13 +57,11 @@ trait LoginContext {
 
 class LoginContextImpl extends LoginContext {
 
-  override def redirectUri: String = ???
-
-  override def status: Int = ???
-
-  override def method: String = ???
+  override def callbackUri: String = ???
 
   override def completedMethods: Array[String] = ???
+
+  override def addCompletedMethod(method: String): LoginContext = ???
 
   override def withParam[T](param: (String, T))(implicit writer: JWriter[T]): LoginContext = ???
 
@@ -82,36 +69,15 @@ class LoginContextImpl extends LoginContext {
 
   override def params: JObj = ???
 
-  /**
-   * Returns a string representation of this [[com.identityblitz.login.LoginContext]].
-   * @return - string representation of this [[com.identityblitz.login.LoginContext]].
-   */
   def asString: String = ???
 }
 
 
 object LoginContext {
 
-  private val defaultAuthnMethod = authnMethodsMap.get("default").map(_.name)
+  def apply(callbackUri: String): LoginContext = ???
 
-  def apply(method: String, callbackUri: String): LoginContext = ???
 
-  def apply(iTr: InboundTransport): LoginContext = {
-    val method = Option(iTr.getAttribute(AUTHN_METHOD_NAME).asInstanceOf[String]).orElse(defaultAuthnMethod).getOrElse({
-      logger.error("A default login method not specified in the configuration. To fix this fix add a parameter " +
-        "'default = true' to an one authentication method")
-      throw new LoginException("A default login method not specified in the configuration. To fix this fix add a" +
-        " parameter 'default = true' to an one authentication method")
-    })
-
-    val callbackUri = Option(iTr.getAttribute(CALLBACK_URI_NAME).asInstanceOf[String]).getOrElse({
-      logger.error("parameter {} not found in the inbound transport", CALLBACK_URI_NAME)
-      throw new LoginException(s"parameter $CALLBACK_URI_NAME not found in the inbound transport")
-    })
-
-    apply(method, callbackUri)
-  }  
-  
   /**
    * Creates [[com.identityblitz.login.LoginContext]]] from string representation.
    * @param str - string representation of [[com.identityblitz.login.LoginContext]]].
