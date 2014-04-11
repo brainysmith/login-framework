@@ -21,6 +21,8 @@ publishArtifact in Test := false
 
 resolvers += "Local Maven Repository" at Path.userHome.asFile.toURI.toURL + "/.m2/repository"
 
+resolvers += "Typesafe releases" at "http://repo.typesafe.com/typesafe/releases"
+
 libraryDependencies ++= Seq(
   "javax.servlet" % "javax.servlet-api" % "3.0.1",
   "org.slf4j" % "slf4j-api" % "1.6.6",
@@ -29,7 +31,8 @@ libraryDependencies ++= Seq(
   "org.scala-lang" % "scala-compiler" % scalaVersion.value,   //for macros
   "org.scalatest" % "scalatest_2.10" % "2.0.1-SNAP" % "test,it",
   "org.scalacheck" %% "scalacheck" % "1.11.2" % "test,it",
-  "com.typesafe.play" % "play_2.10" % "2.2.2" % "provided" exclude("org.slf4j", "slf4j-api")
+  "com.typesafe.play" % "play_2.10" % "2.2.2" % "provided" exclude("org.slf4j", "slf4j-api"),
+  "com.unboundid" % "unboundid-ldapsdk" % "2.3.4"
 )
 
 scalacOptions ++= List("-feature","-deprecation", "-unchecked")
