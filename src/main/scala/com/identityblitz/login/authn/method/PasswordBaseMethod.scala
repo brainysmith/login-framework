@@ -1,13 +1,15 @@
-package com.identityblitz.login.authn
+package com.identityblitz.login.authn.method
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoggingUtils._
 import com.identityblitz.login.error.BuildInError._
 import com.identityblitz.login.LoginFlow
+import java.util.Collections
+import java.util
 
 /**
  */
-class PasswordBaseMethod(private val options: Map[String, String]) extends AuthnMethod {
+class PasswordBaseMethod(options: Map[String, String]) extends AuthnMethod(options) {
 
   private val loginPage = options.get("page").getOrElse({
     logger.error("The password base method can't be instantiate because a login page path not specified. To fix it " +
@@ -38,6 +40,10 @@ class PasswordBaseMethod(private val options: Map[String, String]) extends Authn
         req.forward(loginPage)
     }
 
+  }
+
+  def bind(data: Map[String, String]) = {
+    ???
   }
 }
 

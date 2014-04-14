@@ -26,10 +26,14 @@ trait LoginConfService {
   def getOptBoolean(implicit name: String): Option[Boolean]
 
   /**
-   * Returns a [[Map]] with parameter name and value grouped by keys.
-   * @param name - name of group configuration parameter.
-   * @return [[Map]] with parameter name and value grouped by keys. If there isn't configuration with the specified name
-   *        returns empty [[Map]].
+   * Returns a [[Map]] with properties filtered by specified prefix where
+   * <ul>
+   *   <li>key - is a substring of the property's name from the specified prefix to the next position of the dot (''.'')</li>
+   *   <li>value - [[Map]] similarly grouped by current key </li>
+   * </ul>
+   * @param prefix - prefix of the properties to include to the result.
+   * @return [[Map]] with parameter name (exclude the specified prefix) and value grouped by keys (exclude the specified
+   *        prefix). If there isn't configuration with the specified name returns empty [[Map]].
    */
-  def getDeepMapString(name: String): Map[String, Map[String, String]]
+  def getPropsDeepGrouped(prefix: String): Map[String, Map[String, String]]
 }

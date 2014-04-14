@@ -10,11 +10,19 @@ import scala.util.Try
 /**
  */
 object Conf {
+  private val BINDS_CONF_PREFIX = "binds"
 
   val loginFlow = confService.getOptString("loginFlow")
 
-  val authnMethods = confService.getDeepMapString("authnMethods")
+  val binds = confService.getPropsDeepGrouped("binds")
 
+  val authnMethods = confService.getPropsDeepGrouped("authnMethods")
+
+  def extractBindOptions(options: Map[String, String]) = options.filter(_._1.startsWith("binds"))
+    .map({case (k,v) => k.stripPrefix(BINDS_CONF_PREFIX + ".") -> v})
+    .groupBy(_._1.split('.')(0)).map(entry => {
+    (entry._1, entry._2.map({case (k, v) => (k.stripPrefix(entry._1 + "."), v)}))
+  })
 }
 
 trait AttrMeta {

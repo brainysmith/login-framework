@@ -3,9 +3,10 @@ package com.identityblitz.login
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoggingUtils._
 import scala.annotation.implicitNotFound
-import com.identityblitz.login.authn.AuthnMethods._
+import com.identityblitz.login.authn.method.AuthnMethods._
 import com.identityblitz.login.error.LoginException
 import com.identityblitz.login.FlowAttrName._
+import com.identityblitz.login.util.Reflection
 
 /**
  * Defines a flow of the login process.
@@ -18,7 +19,7 @@ abstract class LoginFlow extends Handler {
 
   /**
    * Starts a new authentication method. If login context (LC) is not found it will be created.
-   * Call the method [[com.identityblitz.login.authn.AuthnMethod.start]] on the according instance of the
+   * Call the method [[com.identityblitz.login.authn.method.AuthnMethod.start]] on the according instance of the
    * authentication method.
    *
    * @param iTr - inbound transport
@@ -144,7 +145,7 @@ object LoginFlow {
     BuiltInLoginFlow
   })(className => {
     logger.debug("find in the configuration a custom login flow [class = {}]", className)
-    this.getClass.getClassLoader.loadClass(className).asInstanceOf[LoginFlow]
+    Reflection.getConstructor(className).apply().asInstanceOf[LoginFlow]
   })
 
   def apply() = loginFlow
