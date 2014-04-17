@@ -2,7 +2,6 @@ package com.identityblitz.login.glue.servlet;
 
 import com.identityblitz.login.*;
 import com.identityblitz.login.authn.method.AuthnMethod;
-import com.identityblitz.login.authn.method.AuthnMethods$;
 import com.identityblitz.login.error.LoginException;
 import com.identityblitz.login.error.TransportException;
 import com.identityblitz.login.transport.InboundTransport;
@@ -22,7 +21,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import static com.identityblitz.login.LoggingUtils.*;
+
+import static com.identityblitz.login.LoggingUtils.logger;
 
 /**
  * The Authentication Point (AP) servlet is the endpoint for Java Servlet based application
@@ -67,10 +67,10 @@ public class APServlet extends HttpServlet {
 
     @Override
     public void init() throws ServletException {
-        handlers = new HashMap<String, Handler>(AuthnMethods$.MODULE$.authnMethodsMap().size() + 1);
+        handlers = new HashMap<String, Handler>(Conf$.MODULE$.methods().size() + 1);
 
         for(Map.Entry<String, AuthnMethod> entry : WrapAsJava$.MODULE$.mapAsJavaMap(
-                AuthnMethods$.MODULE$.authnMethodsMap()).entrySet()) {
+                Conf$.MODULE$.methods()).entrySet()) {
             handlers.put(entry.getKey(), entry.getValue());
         }
         handlers.put("flow", LoginFlow.apply());

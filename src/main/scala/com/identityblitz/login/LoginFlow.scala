@@ -3,10 +3,9 @@ package com.identityblitz.login
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoggingUtils._
 import scala.annotation.implicitNotFound
-import com.identityblitz.login.authn.method.AuthnMethods._
 import com.identityblitz.login.error.LoginException
 import com.identityblitz.login.FlowAttrName._
-import com.identityblitz.login.util.Reflection
+import com.identityblitz.login.Conf.methods
 
 /**
  * Defines a flow of the login process.
@@ -15,7 +14,7 @@ import com.identityblitz.login.util.Reflection
 @implicitNotFound("No implicit inbound or outbound found.")
 abstract class LoginFlow extends Handler {
 
-  private val defaultAuthnMethod = authnMethodsMap.get("default").map(_.name)
+  private val defaultAuthnMethod = methods.get("default").map(_.name)
 
   /**
    * Starts a new authentication method. If login context (LC) is not found it will be created.
@@ -49,11 +48,11 @@ abstract class LoginFlow extends Handler {
     }).asInstanceOf[String]
 
     logger.debug("Starting a new authentication method: {}", method)
-    authnMethodsMap.get(method).map(_.start).orElse({
+    methods.get(method).map(_.start).orElse({
       logger.error("The specified authentication method [{}] is not configured. Configured methods: {}",
-        method, authnMethodsMap.keySet)
+        method, methods.keySet)
       throw new LoginException(s"the specified authentication method [$method] is not configured. Configured " +
-        s"methods: ${authnMethodsMap.keySet}")
+        s"methods: ${methods.keySet}")
     })
   }
 
@@ -140,15 +139,7 @@ abstract class LoginFlow extends Handler {
 
 object LoginFlow {
 
-  private val loginFlow = Conf.loginFlow.fold[LoginFlow]({
-    logger.debug("will use the built-in login flow: {}", BuiltInLoginFlow.getClass.getSimpleName)
-    BuiltInLoginFlow
-  })(className => {
-    logger.debug("find in the configuration a custom login flow [class = {}]", className)
-    Reflection.getConstructor(className).apply().asInstanceOf[LoginFlow]
-  })
-
-  def apply() = loginFlow
+  def apply() = Conf.loginFlow
 
 }
 

@@ -4,6 +4,7 @@ package com.identityblitz.login.service.spi
  * The service provides access to the configuration.
  */
 trait LoginConfService {
+
   /**
    * Returns a configuration value corresponding to the specified name.
    * @param name - name of configuration parameter.
@@ -25,6 +26,9 @@ trait LoginConfService {
    */
   def getOptBoolean(implicit name: String): Option[Boolean]
 
+
+  def getPropsGrouped(prefix: String): Map[String, String]
+
   /**
    * Returns a [[Map]] with properties filtered by specified prefix where
    * <ul>
@@ -36,4 +40,5 @@ trait LoginConfService {
    *        prefix). If there isn't configuration with the specified name returns empty [[Map]].
    */
   def getPropsDeepGrouped(prefix: String): Map[String, Map[String, String]]
+
 }

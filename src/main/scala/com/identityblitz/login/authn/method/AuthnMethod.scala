@@ -1,51 +1,36 @@
 package com.identityblitz.login.authn.method
 
+import com.identityblitz.login.LoggingUtils._
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.{Conf, Handler}
 import com.identityblitz.login.error.LoginException
-import com.identityblitz.login.authn.method.AuthnMethod._
-import com.identityblitz.login.authn.bind.BindProviders
-import com.identityblitz.login.LoggingUtils._
+import scala.language.implicitConversions
 
 /**
  *
  * important: an implementation must have the constructor with following signature ''(options: Map[String, String])''.
   */
-abstract class AuthnMethod(val options: Map[String, String]) extends Handler {
+abstract class AuthnMethod(val name:String, val options: Map[String, String]) extends Handler {
 
-  protected val bindFunctions = options.filter(_._1.startsWith(BINDS_CONF_PREFIX))
-    .map{case (k,v) => k.stripPrefix(BINDS_CONF_PREFIX + ".") -> v}
-    .groupBy(_._1.split('.')(0)).map(entry => {
-    (entry._1, entry._2.map({case (k, v) => (k.stripPrefix(entry._1 + "."), v)}))
-  }).map{case (k, v) =>
-    val order = v.get(ORDER_PARAM_NAME).fold(Int.MaxValue)(augmentString(_).toInt)
-    order -> BindProviders.providerMap.get(k).getOrElse({
-      val err = s"Specified an unknown '$k' bind provider for the '$name' authentication method"
-      logger.error(err)
-      throw new IllegalStateException(err)
-    }).bind(v)_}.toArray.sortBy(_._1).map(_._2)
-
-
-/*  protected def bind(data: Map[String, String]) = for (
-    f <- bindFunctions;
-    res <- f(data)
-  ) yield res*/
-
-  /**
-   * The name of the authentication method.
-   * @return
-   */
-  def name:String
-
+  val bindSchema = options.get("bind").orElse({
+    val err = s"Bind schema of '$name' authentication method is not specified"
+    logger.error(err)
+    throw new IllegalStateException(err)
+  }).flatMap(Conf.binds.get).getOrElse({
+    val err = s"specified bind schema in the '$name' authentication method is not configured"
+    logger.error(err)
+    throw new IllegalStateException(err)
+  })
+  
   /**
    * The method is called each time before a new authentication method is started. The method makes it possible to do
    * some preparatory actions (e.g. generate challenge) and return forward or redirect request to a specific for
    * the current method login url.
-   * @param req
-   * @param resp
+   * @param iTr - inbound transport
+   * @param oTr - outbound transport
    */
   @throws(classOf[LoginException])
-  def start(implicit req: InboundTransport, resp: OutboundTransport)
+  def start(implicit iTr: InboundTransport, oTr: OutboundTransport)
 
 
   /**
@@ -57,14 +42,5 @@ abstract class AuthnMethod(val options: Map[String, String]) extends Handler {
    */
   @throws(classOf[LoginException])
   def DO(implicit req: InboundTransport, resp: OutboundTransport)
-
-}
-
-
-private object AuthnMethod {
-
-  val BINDS_CONF_PREFIX = "binds"
-
-  val ORDER_PARAM_NAME = "order"
 
 }

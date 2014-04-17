@@ -1,29 +1,123 @@
 package com.identityblitz.login
 
 import com.identityblitz.login.service.ServiceProvider
-import ServiceProvider.confService
 import com.identityblitz.json.{JArr, JVal, JObj}
 import com.identityblitz.login.LoggingUtils._
 import com.identityblitz.login.AttrType.AttrType
 import scala.util.Try
+import com.identityblitz.login.authn.method.AuthnMethod
+import com.identityblitz.login.authn.bind.{BindFlag, BindProvider}
+import com.identityblitz.login.util.Reflection
+import scala.language.implicitConversions
 
 /**
  */
 object Conf {
-  private val BINDS_CONF_PREFIX = "binds"
+  import ServiceProvider.confService
 
-  val loginFlow = confService.getOptString("loginFlow")
-
-  val binds = confService.getPropsDeepGrouped("binds")
-
-  val authnMethods = confService.getPropsDeepGrouped("authnMethods")
-
-  def extractBindOptions(options: Map[String, String]) = options.filter(_._1.startsWith("binds"))
-    .map({case (k,v) => k.stripPrefix(BINDS_CONF_PREFIX + ".") -> v})
-    .groupBy(_._1.split('.')(0)).map(entry => {
-    (entry._1, entry._2.map({case (k, v) => (k.stripPrefix(entry._1 + "."), v)}))
+  val loginFlow = confService.getOptString("loginFlow").fold[LoginFlow]({
+    logger.debug("will use the built-in login flow: {}", BuiltInLoginFlow.getClass.getSimpleName)
+    BuiltInLoginFlow
+  })(className => {
+    logger.debug("find in the configuration a custom login flow [class = {}]", className)
+    Reflection.getConstructor(className).apply().asInstanceOf[LoginFlow]
   })
+
+  val bps = confService.getPropsDeepGrouped("bps").map{
+    case (name, options) => name -> new BindProviderMeta(name, options).newInstance
+  }
+
+  val binds = confService.getPropsGrouped("binds").mapValues(bindSchema => {
+    bindSchema.trim.split(";").map(bindMeta => {
+      val parts = bindMeta.trim.split(" ")
+      bps.getOrElse(parts(0), {
+        val err = s"Can't parse binds configuration: specified '${parts(0)}' bind provider is not configured"
+        logger.error(err)
+        throw new IllegalStateException(err)
+      }) -> {
+        if (parts.size > 1)
+          BindFlag.withName(parts(1))
+        else BindFlag.sufficient
+      }
+    }).ensuring(_.length > 0, {
+      val err = "Binds configuration error: some of the bind`s schema is blank"
+      logger.error(err)
+      throw new IllegalStateException(err)
+    })
+  })
+
+
+  val methods = confService.getPropsDeepGrouped("authnMethods")
+    .map({case (name, options) => AuthnMethodMeta(name, options)})
+    .foldLeft[collection.mutable.Map[String, AuthnMethod]](collection.mutable.Map())(
+      (res, meta) => {
+        val instance = meta.newInstance
+        if (meta.isDefault) {
+          res += ("default" -> instance)
+        }
+        res += (instance.name -> instance)
+      }
+    ).toMap
 }
+
+trait Instantiable[A] {
+
+  def options: Map[String, String]
+
+  protected lazy val className = options.get("class").getOrElse({
+    val error = "parameter 'class' is not specified in the options"
+    logger.error(error)
+    throw new IllegalStateException(error)
+  })
+
+  private lazy val classConstructor = Reflection.getConstructor(className)
+
+  def args: Array[Any]
+
+  def newInstance: A = classConstructor.apply(args _).asInstanceOf[A]
+
+}
+
+
+private case class BindProviderMeta(name: String, options: Map[String, String]) extends Instantiable[BindProvider] {
+
+  override val args: Array[Any] = Array(options)
+
+  override def toString: String = {
+    val sb =new StringBuilder("BindProviderMeta(")
+    sb.append("name -> ").append(name).append(",")
+      .append("options -> ").append(options)
+      .append(")").toString()
+  }
+}
+
+private case class AuthnMethodMeta(name: String, options: Map[String, String]) extends Instantiable[AuthnMethod] {
+
+  private object Options extends Enumeration {
+    import scala.language.implicitConversions
+
+    type Options = Value
+    val default, bind, `class` = Value
+
+    implicit def valueToString(v: Value): String = v.toString
+
+    val builtInOptions = values.map(_.toString)
+  }
+
+  import Options._
+
+  val isDefault = options.get(default).fold(false)(_.toBoolean)
+
+  override val args: Array[Any] = Array(name, options.filter(entry => !builtInOptions.contains(entry._1)))
+
+  override def toString: String = {
+    val sb =new StringBuilder("AuthnMethodMeta(")
+    sb.append("name -> ").append(name).append(",")
+      .append("options -> ").append(options)
+    .append(")").toString()
+  }
+}
+
 
 trait AttrMeta {
   if (baseName == null || valType == null) throw new NullPointerException("baseName and valType can't ba null")

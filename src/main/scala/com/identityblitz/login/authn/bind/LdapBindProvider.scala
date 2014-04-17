@@ -5,11 +5,11 @@ import com.unboundid.ldap.sdk._
 import com.unboundid.util.ssl.{TrustAllTrustManager, SSLUtil}
 import com.identityblitz.login.authn.bind.LdapBindProvider._
 import scala.collection
-import scala.util.Try
+import com.identityblitz.login.authn.BindRes
 
 /**
  */
-class LdapBindProvider(options: Map[String, String]) extends BindProvider(options) {
+class LdapBindProvider(name:String, options: Map[String, String]) extends BindProvider(name, options) {
 
   logger.trace("initializing the ldap authentication module [options={}]", options)
 
@@ -55,9 +55,7 @@ class LdapBindProvider(options: Map[String, String]) extends BindProvider(option
   val pool = new LDAPConnectionPool(connection, initialConnections, maxConnections)
 
   //todo: do it
-  override def bind(bindOptions: Map[String, String])(data: Map[String, String]): Try[Map[String, Any]] = {
-    ???
-  }
+  override def bind(data: Map[String, String]): BindRes = ???
 
 
   /** other functions **/
