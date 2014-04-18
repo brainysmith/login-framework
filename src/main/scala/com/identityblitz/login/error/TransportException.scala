@@ -4,7 +4,7 @@ package com.identityblitz.login.error
 /**
   */
 
-class TransportException(message: String, cause: Throwable) extends LoginException(message: String, cause: Throwable) {
+class TransportException(message: String, cause: Throwable) extends LoginException(message, cause) {
   def this(cause: Throwable) = this(null, cause)
   def this(message: String) = this(message, null)
 }

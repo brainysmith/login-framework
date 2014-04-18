@@ -2,7 +2,7 @@ package com.identityblitz.login.authn.method
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.error.BuildInError._
+import com.identityblitz.login.error.BuiltInError._
 import com.identityblitz.login.LoginFlow
 import java.util.Collections
 import java.util

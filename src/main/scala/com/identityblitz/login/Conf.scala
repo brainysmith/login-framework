@@ -1,12 +1,9 @@
 package com.identityblitz.login
 
 import com.identityblitz.login.service.ServiceProvider
-import com.identityblitz.json.{JArr, JVal, JObj}
 import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.AttrType.AttrType
-import scala.util.Try
 import com.identityblitz.login.authn.method.AuthnMethod
-import com.identityblitz.login.authn.bind.{BindFlag, BindProvider}
+import com.identityblitz.login.authn.provider.{WithAttributes, WithBind, Provider}
 import com.identityblitz.login.util.Reflection
 import scala.language.implicitConversions
 
@@ -16,18 +13,26 @@ object Conf {
   import ServiceProvider.confService
 
   val loginFlow = confService.getOptString("loginFlow").fold[LoginFlow]({
-    logger.debug("will use the built-in login flow: {}", BuiltInLoginFlow.getClass.getSimpleName)
+    logger.debug("Will use the built-in login flow: {}", BuiltInLoginFlow.getClass.getSimpleName)
     BuiltInLoginFlow
   })(className => {
-    logger.debug("find in the configuration a custom login flow [class = {}]", className)
+    logger.debug("Find in the configuration a custom login flow [class = {}]", className)
     Reflection.getConstructor(className).apply().asInstanceOf[LoginFlow]
   })
 
-  val bps = confService.getPropsDeepGrouped("bps").map{
-    case (name, options) => name -> new BindProviderMeta(name, options).newInstance
+  val providers = confService.getPropsDeepGrouped("providers").map{
+    case (name, options) =>
+      val meta = new ProviderMeta(name, options)
+      name -> (meta.newInstance -> meta)
   }
 
-  val binds = confService.getPropsGrouped("binds").mapValues(bindSchema => {
+  def resolveProvider(name: String) = providers.get(name).getOrElse({
+    val err = s"Provider with name $name is not found"
+    logger.error(err)
+    throw new IllegalArgumentException(err)
+  })._1
+
+/*  val binds = confService.getPropsGrouped("binds").mapValues(bindSchema => {
     bindSchema.trim.split(";").map(bindMeta => {
       val parts = bindMeta.trim.split(" ")
       bps.getOrElse(parts(0), {
@@ -44,23 +49,91 @@ object Conf {
       logger.error(err)
       throw new IllegalStateException(err)
     })
-  })
+  })*/
 
 
   val methods = confService.getPropsDeepGrouped("authnMethods")
-    .map({case (name, options) => AuthnMethodMeta(name, options)})
-    .foldLeft[collection.mutable.Map[String, AuthnMethod]](collection.mutable.Map())(
-      (res, meta) => {
-        val instance = meta.newInstance
+    .map({case (name, options) => AuthnMethodMeta(name, options, resolveProvider)})
+    .foldLeft[collection.mutable.Map[String, (AuthnMethod, AuthnMethodMeta)]](collection.mutable.Map())(
+      (acm, meta) => {
+        val value = meta.newInstance -> meta
         if (meta.isDefault) {
-          res += ("default" -> instance)
+          acm += ("default" -> value)
         }
-        res += (instance.name -> instance)
+        acm += (meta.name -> value)
       }
     ).toMap
+
+  def resolveMethod(name: String) = methods.get(name).getOrElse({
+    val err = s"Authentication method with name $name is not found"
+    logger.error(err)
+    throw new IllegalArgumentException(err)
+  })._1
 }
 
-trait Instantiable[A] {
+case class ProviderMeta(name: String, options: Map[String, String]) extends Instantiable[Provider] {
+
+  private object Options extends Enumeration {
+    import scala.language.implicitConversions
+
+    type Options = Value
+    val `class` = Value
+
+    implicit def valueToString(v: Value): String = v.toString
+
+    val builtInOptions = values.map(_.toString)
+  }
+
+  import Options._
+
+  override val initArgs = Array(name, options.filter(entry => !builtInOptions.contains(entry._1)))
+
+  override def toString: String = {
+    val sb =new StringBuilder("BindProviderMeta(")
+    sb.append("name -> ").append(name).append(",")
+      .append("options -> ").append(options)
+      .append(")").toString()
+  }
+}
+
+case class AuthnMethodMeta(name: String, options: Map[String, String],
+                           private val resolveProvider: (String) => Provider) extends Instantiable[AuthnMethod] {
+
+  private object Options extends Enumeration {
+    import scala.language.implicitConversions
+
+    type Options = Value
+    val `class`, default, `bind-providers`, `attributes-providers` = Value
+
+    implicit def valueToString(v: Value): String = v.toString
+
+    val builtInOptions = values.map(_.toString)
+  }
+
+  import Options._
+  
+  val isDefault = options.get(default).fold(false)(_.toBoolean)
+  val bindProviders = options.get(`bind-providers`).map(_.split(",")).getOrElse({
+    logger.warn(s"Configuration warning: 'bind-providers' is not specified for '$name' authentication method.")
+    Array()
+  }).map(resolveProvider).filter(bp => {classOf[WithBind].isAssignableFrom(bp.getClass)})
+    .map(_.asInstanceOf[Provider with WithBind])
+
+  val attributesProviders = options.get(`attributes-providers`).map(_.split(",")).getOrElse(Array())
+    .map(resolveProvider).filter(bp => {classOf[WithAttributes].isAssignableFrom(bp.getClass)})
+    .map(_.asInstanceOf[Provider with WithAttributes])
+
+  override val initArgs = Array(name, options.filter(entry => !builtInOptions.contains(entry._1)))
+
+  override def toString: String = {
+    val sb =new StringBuilder("AuthnMethodMeta(")
+    sb.append("name -> ").append(name).append(",")
+      .append("options -> ").append(options)
+    .append(")").toString()
+  }
+}
+
+private trait Instantiable[A] {
 
   def options: Map[String, String]
 
@@ -72,108 +145,8 @@ trait Instantiable[A] {
 
   private lazy val classConstructor = Reflection.getConstructor(className)
 
-  def args: Array[Any]
+  def initArgs: Array[Any]
 
-  def newInstance: A = classConstructor.apply(args _).asInstanceOf[A]
+  def newInstance: A = classConstructor.apply(initArgs _).asInstanceOf[A]
 
-}
-
-
-private case class BindProviderMeta(name: String, options: Map[String, String]) extends Instantiable[BindProvider] {
-
-  override val args: Array[Any] = Array(options)
-
-  override def toString: String = {
-    val sb =new StringBuilder("BindProviderMeta(")
-    sb.append("name -> ").append(name).append(",")
-      .append("options -> ").append(options)
-      .append(")").toString()
-  }
-}
-
-private case class AuthnMethodMeta(name: String, options: Map[String, String]) extends Instantiable[AuthnMethod] {
-
-  private object Options extends Enumeration {
-    import scala.language.implicitConversions
-
-    type Options = Value
-    val default, bind, `class` = Value
-
-    implicit def valueToString(v: Value): String = v.toString
-
-    val builtInOptions = values.map(_.toString)
-  }
-
-  import Options._
-
-  val isDefault = options.get(default).fold(false)(_.toBoolean)
-
-  override val args: Array[Any] = Array(name, options.filter(entry => !builtInOptions.contains(entry._1)))
-
-  override def toString: String = {
-    val sb =new StringBuilder("AuthnMethodMeta(")
-    sb.append("name -> ").append(name).append(",")
-      .append("options -> ").append(options)
-    .append(")").toString()
-  }
-}
-
-
-trait AttrMeta {
-  if (baseName == null || valType == null) throw new NullPointerException("baseName and valType can't ba null")
-
-  def baseName: String
-
-  def valType: AttrType
-
-  override def toString: String = {
-    val sb =new StringBuilder("AttrMeta(")
-    sb.append("baseName -> ").append(baseName)
-    sb.append(", ").append("valType -> ").append(valType)
-    sb.append(")").toString()
-  }
-}
-
-case class AttrMetaImpl(baseName: String, valType: AttrType) extends AttrMeta {}
-
-object AttrMeta {
-
-  def apply(v: JObj): AttrMeta = {
-    Right[String, Seq[Any]](Seq()).right.map(seq => {
-      (v \ "baseName").asOpt[String].fold[Either[String, Seq[Any]]](Left("baseName.notFound"))(baseName => {
-        Right(seq :+ baseName)
-      })
-    }).joinRight.right.map(seq => {
-      (v \ "valType").asOpt[String].fold[Either[String, Seq[Any]]](Left("valType.notFound"))(valTypeStr => {
-        Try(AttrType.withName(valTypeStr.toLowerCase)).toOption
-          .fold[Either[String, Seq[Any]]](Left("valType.unknown"))(valType => {
-          Right(seq :+ valType)
-        })
-      })
-    }).joinRight match {
-      case Left(err) => {
-        logger.error("can't parse attrMeta [error = {}, json = {}]", Seq(err, v.toJson))
-        throw new IllegalArgumentException("can't parse attrMeta")
-      }
-      case Right(seq) => {
-        val attrMeta = new AttrMetaImpl(seq(0).asInstanceOf[String], seq(1).asInstanceOf[AttrType])
-        logger.error("the attrMeta has been parsed successfully [attrMeta = {}]", attrMeta)
-        attrMeta
-      }
-    }
-  }
-
-  def apply(jsonStr: String): AttrMeta = apply(JVal.parseStr(jsonStr).asInstanceOf[JObj])
-
-  def parseArray(jsonStr: String): Seq[AttrMeta] = {
-    JVal.parseStr(jsonStr).asInstanceOf[JArr].map(jv => apply(jv.asInstanceOf[JObj]))
-  }
-}
-
-/**
- * Enumeration of the login attribute types.
- */
-object AttrType extends Enumeration {
-  type AttrType = Value
-  val string, strings, boolean, number, bytes = Value
 }

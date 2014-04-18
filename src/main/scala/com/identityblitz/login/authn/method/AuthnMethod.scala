@@ -1,8 +1,7 @@
 package com.identityblitz.login.authn.method
 
-import com.identityblitz.login.LoggingUtils._
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
-import com.identityblitz.login.{Conf, Handler}
+import com.identityblitz.login.Handler
 import com.identityblitz.login.error.LoginException
 import scala.language.implicitConversions
 
@@ -12,7 +11,7 @@ import scala.language.implicitConversions
   */
 abstract class AuthnMethod(val name:String, val options: Map[String, String]) extends Handler {
 
-  val bindSchema = options.get("bind").orElse({
+/*  val bindSchema = options.get("bind").orElse({
     val err = s"Bind schema of '$name' authentication method is not specified"
     logger.error(err)
     throw new IllegalStateException(err)
@@ -20,7 +19,7 @@ abstract class AuthnMethod(val name:String, val options: Map[String, String]) ex
     val err = s"specified bind schema in the '$name' authentication method is not configured"
     logger.error(err)
     throw new IllegalStateException(err)
-  })
+  })*/
   
   /**
    * The method is called each time before a new authentication method is started. The method makes it possible to do

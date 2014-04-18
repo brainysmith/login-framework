@@ -9,6 +9,7 @@ import com.identityblitz.login.transport.OutboundTransport;
 import com.identityblitz.scs.SCSService;
 import scala.Enumeration;
 import scala.Option;
+import scala.Tuple2;
 import scala.collection.convert.WrapAsJava$;
 
 import javax.servlet.ServletException;
@@ -69,9 +70,9 @@ public class APServlet extends HttpServlet {
     public void init() throws ServletException {
         handlers = new HashMap<String, Handler>(Conf$.MODULE$.methods().size() + 1);
 
-        for(Map.Entry<String, AuthnMethod> entry : WrapAsJava$.MODULE$.mapAsJavaMap(
+        for(Map.Entry<String, Tuple2<AuthnMethod, AuthnMethodMeta>> entry : WrapAsJava$.MODULE$.mapAsJavaMap(
                 Conf$.MODULE$.methods()).entrySet()) {
-            handlers.put(entry.getKey(), entry.getValue());
+            handlers.put(entry.getKey(), entry.getValue()._1());
         }
         handlers.put("flow", LoginFlow.apply());
     }

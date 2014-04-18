@@ -1,15 +1,18 @@
-package com.identityblitz.login.authn.bind
+package com.identityblitz.login.authn.provider
 
 import com.identityblitz.login.LoggingUtils._
 import com.unboundid.ldap.sdk._
 import com.unboundid.util.ssl.{TrustAllTrustManager, SSLUtil}
-import com.identityblitz.login.authn.bind.LdapBindProvider._
+import com.identityblitz.login.authn.provider.LdapBindProvider._
 import scala.collection
 import com.identityblitz.login.authn.BindRes
+import com.identityblitz.json.{JArr, JVal, JObj}
+import scala.util.Try
+import com.identityblitz.login.authn.provider.AttrType.AttrType
 
 /**
  */
-class LdapBindProvider(name:String, options: Map[String, String]) extends BindProvider(name, options) {
+class LdapBindProvider(name:String, options: Map[String, String]) extends Provider(name, options) {
 
   logger.trace("initializing the ldap authentication module [options={}]", options)
 
@@ -91,4 +94,64 @@ private object LdapBindProvider {
     rOrL(_)("maxConnections", Right(5), str => str.toInt)  
   )
 
+}
+
+
+trait AttrMeta {
+  if (baseName == null || valType == null) throw new NullPointerException("baseName and valType can't ba null")
+
+  def baseName: String
+
+  def valType: AttrType
+
+  override def toString: String = {
+    val sb =new StringBuilder("AttrMeta(")
+    sb.append("baseName -> ").append(baseName)
+    sb.append(", ").append("valType -> ").append(valType)
+    sb.append(")").toString()
+  }
+}
+
+case class AttrMetaImpl(baseName: String, valType: AttrType) extends AttrMeta {}
+
+object AttrMeta {
+
+  def apply(v: JObj): AttrMeta = {
+    Right[String, Seq[Any]](Seq()).right.map(seq => {
+      (v \ "baseName").asOpt[String].fold[Either[String, Seq[Any]]](Left("baseName.notFound"))(baseName => {
+        Right(seq :+ baseName)
+      })
+    }).joinRight.right.map(seq => {
+      (v \ "valType").asOpt[String].fold[Either[String, Seq[Any]]](Left("valType.notFound"))(valTypeStr => {
+        Try(AttrType.withName(valTypeStr.toLowerCase)).toOption
+          .fold[Either[String, Seq[Any]]](Left("valType.unknown"))(valType => {
+          Right(seq :+ valType)
+        })
+      })
+    }).joinRight match {
+      case Left(err) => {
+        logger.error("can't parse attrMeta [error = {}, json = {}]", Seq(err, v.toJson))
+        throw new IllegalArgumentException("can't parse attrMeta")
+      }
+      case Right(seq) => {
+        val attrMeta = new AttrMetaImpl(seq(0).asInstanceOf[String], seq(1).asInstanceOf[AttrType])
+        logger.error("the attrMeta has been parsed successfully [attrMeta = {}]", attrMeta)
+        attrMeta
+      }
+    }
+  }
+
+  def apply(jsonStr: String): AttrMeta = apply(JVal.parseStr(jsonStr).asInstanceOf[JObj])
+
+  def parseArray(jsonStr: String): Seq[AttrMeta] = {
+    JVal.parseStr(jsonStr).asInstanceOf[JArr].map(jv => apply(jv.asInstanceOf[JObj]))
+  }
+}
+
+/**
+ * Enumeration of attribute types.
+ */
+object AttrType extends Enumeration {
+  type AttrType = Value
+  val string, strings, boolean, number, bytes = Value
 }

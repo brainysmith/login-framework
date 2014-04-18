@@ -2,7 +2,7 @@ package com.identityblitz.login.authn.cmd
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json.JVal
-import scala.util.Try
+import com.identityblitz.login.error.CommandException
 
 
 /**
@@ -13,7 +13,7 @@ case class ChangePswdCmd(login: String, curPswd: String, newPswd: String) extend
 
   override val name: String = COMMAND_NAME
 
-  override def execute(implicit req: InboundTransport, resp: OutboundTransport): Try[Seq[Command]] = ???
+  override def execute(implicit req: InboundTransport, resp: OutboundTransport): Either[CommandException, Option[Command]]= ???
 
   override def saveState: JVal = ???
 }

@@ -1,4 +1,4 @@
-package com.identityblitz.login.authn.bind
+package com.identityblitz.login.authn.provider
 
 import com.identityblitz.login.authn.cmd.Command
 

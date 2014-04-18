@@ -4,6 +4,7 @@ import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json.{Json, JVal}
 import com.identityblitz.login.LoggingUtils._
 import scala.util.Try
+import com.identityblitz.login.error.CommandException
 
 /**
   */
@@ -11,7 +12,7 @@ trait Command {
 
   def name: String
 
-  def execute(implicit iTr: InboundTransport, oTr: OutboundTransport): Try[Seq[Command]]
+  def execute(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Option[Command]]
 
   def saveState: JVal
 
