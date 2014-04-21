@@ -129,6 +129,6 @@ sealed trait Instantiable[A] {
 
   def initArgs: Array[Any]
 
-  def newInstance: A = classConstructor.apply(initArgs _).asInstanceOf[A]
+  def newInstance: A = classConstructor.apply(initArgs:_*).asInstanceOf[A]
 
 }
