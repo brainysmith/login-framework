@@ -61,7 +61,7 @@ abstract class AuthnMethod(val name:String, val options: Map[String, String]) ex
    */
   @throws(classOf[LoginException])
   final def DO(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    iTr.getAttribute(FlowAttrName.COMMAND).map(_.asInstanceOf[String])
+    iTr.getParameter(FlowAttrName.COMMAND)
       .map[Command](Command(_))
       .map(_.execute)
       .map(res => res.left.flatMap(recover) match {
