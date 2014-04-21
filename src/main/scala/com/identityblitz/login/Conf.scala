@@ -12,14 +12,6 @@ import scala.language.implicitConversions
 object Conf {
   import ServiceProvider.confService
 
-  val loginFlow = confService.getOptString("loginFlow").fold[LoginFlow]({
-    logger.debug("Will use the built-in login flow: {}", BuiltInLoginFlow.getClass.getSimpleName)
-    BuiltInLoginFlow
-  })(className => {
-    logger.debug("Find in the configuration a custom login flow [class = {}]", className)
-    Reflection.getConstructor(className).apply().asInstanceOf[LoginFlow]
-  })
-
   val providers = confService.getPropsDeepGrouped("providers").map{
     case (name, options) =>
       val meta = new ProviderMeta(name, options)
@@ -43,6 +35,14 @@ object Conf {
         acm += (meta.name -> value)
       }
     ).toMap
+
+  val loginFlow = confService.getOptString("loginFlow").fold[LoginFlow]({
+    logger.debug("Will use the built-in login flow: {}", BuiltInLoginFlow.getClass.getSimpleName)
+    BuiltInLoginFlow
+  })(className => {
+    logger.debug("Find in the configuration a custom login flow [class = {}]", className)
+    Reflection.getConstructor(className).apply().asInstanceOf[LoginFlow]
+  })
 
   def resolveMethod(name: String) = methods.get(name).getOrElse({
     val err = s"Authentication method with name $name is not found"
