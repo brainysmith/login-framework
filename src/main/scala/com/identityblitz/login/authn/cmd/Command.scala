@@ -3,8 +3,8 @@ package com.identityblitz.login.authn.cmd
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json.{Json, JVal}
 import com.identityblitz.login.LoggingUtils._
-import scala.util.Try
 import com.identityblitz.login.error.CommandException
+import org.apache.commons.codec.binary.Base64
 
 /**
   */
@@ -16,7 +16,8 @@ trait Command {
 
   def saveState: JVal
 
-  final def asString(): String = Json.obj("name" -> name, "state" -> saveState).toJson
+  final def asString(): String =
+    Base64.encodeBase64String(Json.obj("name" -> name, "state" -> saveState).toJson.getBytes("UTF-8"))
 
 }
 
@@ -27,7 +28,7 @@ object Command {
   )
 
   def apply[T <: Command](cmdStr: String): T = {
-    val jval = JVal.parseStr(cmdStr)
+    val jval = JVal.parseStr(new String(Base64.decodeBase64(cmdStr), "UTF-8"))
     (jval \ "name").asOpt[String].fold[T]({
       val err = s"Deserialization of the command [$cmdStr] failed: the name attribute is not found"
       logger.error(err)
