@@ -182,12 +182,12 @@ class ServletInboundTransport implements InboundTransport {
     }
 
     @Override
-    public Option<Object> getAttribute(String name) {
-        return Option.apply(req.getAttribute(name));
+    public Option<String> getAttribute(String name) {
+        return Option.apply((String)req.getAttribute(name));
     }
 
     @Override
-    public void setAttribute(String name, Object value) {
+    public void setAttribute(String name, String value) {
         req.setAttribute(name, value);
     }
 

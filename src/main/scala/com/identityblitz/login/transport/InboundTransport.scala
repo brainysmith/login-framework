@@ -63,14 +63,14 @@ trait InboundTransport {
    * The lifespan of the attribute is the same as the lifespan of the transport this attribute set on.
    * @return - attribute value
    */
-  def getAttribute(name: String): Option[AnyRef]
+  def getAttribute(name: String): Option[String]
 
   /**
    * Sets the attribute on the transport.
    * @param name - attribute name;
    * @param value - attribute value.
    */
-  def setAttribute(name: String, value: AnyRef)
+  def setAttribute(name: String, value: String)
 
   //def getParameterMap: Map[String, Array[String]]
 }
