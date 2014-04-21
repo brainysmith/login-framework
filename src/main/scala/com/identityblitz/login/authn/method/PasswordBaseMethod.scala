@@ -2,10 +2,9 @@ package com.identityblitz.login.authn.method
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.LoginFlow
-import java.util.Collections
-import com.identityblitz.login.authn.cmd.Command
+import com.identityblitz.login.authn.cmd.{BindCommand, Command}
 import com.identityblitz.login.error.CommandException
+import com.identityblitz.login.authn.method.PasswordBaseMethod.FormParams
 
 /**
  */
@@ -19,7 +18,23 @@ class PasswordBaseMethod(name: String, options: Map[String, String]) extends Aut
   })
 
   override def start(implicit req: InboundTransport, resp: OutboundTransport): Unit = {
-    req.forward(loginPage)
+    sendCommand(BindCommand(name, FormParams.allParams))
+  }
+
+  override protected def route(cmd: Command)(implicit iTr: InboundTransport, oTr: OutboundTransport): String = {
+    loginPage
+  }
+
+  override protected def recover(cmdException: CommandException)
+                                (implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    addError(cmdException.errorKey)
+    cmdException.cmd match {
+      case bindCmd: BindCommand => Right(Some(BindCommand(bindCmd)))
+    }
+  }
+
+  private def addError(error: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    iTr.setAttribute(FormParams.error, error)
   }
 
 /*  override def DO(implicit req: InboundTransport, resp: OutboundTransport): Unit = {
@@ -44,11 +59,19 @@ class PasswordBaseMethod(name: String, options: Map[String, String]) extends Aut
     }
 
   }*/
-
-  override def recover(cmdException: CommandException): Unit = ???
-
-  override protected def route(cmd: Command)(implicit iTr: InboundTransport, oTr: OutboundTransport): String = ???
 }
 
 object PasswordBaseMethod {
+
+  object FormParams extends Enumeration {
+    import scala.language.implicitConversions
+
+    type Options = Value
+    val login, password, error = Value
+
+    implicit def valueToString(v: Value): String = v.toString
+
+    val allParams = values.map(_.toString).toSeq
+  }
+
 }

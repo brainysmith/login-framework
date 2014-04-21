@@ -8,7 +8,7 @@ import com.identityblitz.login.error.CommandException
 /**
  
  */
-case class ChangePswdCmd(login: String, curPswd: String, newPswd: String) extends Command {
+case class ChangePswdCmd(login: String) extends Command {
   import ChangePswdCmd._
 
   override val name: String = COMMAND_NAME

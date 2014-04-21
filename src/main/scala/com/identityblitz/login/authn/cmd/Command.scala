@@ -23,7 +23,7 @@ trait Command {
 object Command {
 
   private val cmdMap = Map[String, (JVal => Command)](
-    BindCmd.COMMAND_NAME -> {(state: JVal) => BindCmd(state)}
+    BindCommand.COMMAND_NAME -> {(state: JVal) => BindCommand(state)}
   )
 
   def apply[T <: Command](cmdStr: String): T = {

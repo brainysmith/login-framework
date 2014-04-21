@@ -9,9 +9,9 @@ import com.identityblitz.login.error.CommandException
 /**
  */
 
-sealed abstract class BindCmd(val methodName: String, val params: Seq[String],
-                              val attempts: Int = 0, val errorKey: String = null) extends Command {
-  import BindCmd._
+sealed abstract class BindCommand(val methodName: String, val params: Seq[String],
+                                  val attempts: Int = 0) extends Command {
+  import BindCommand._
 
   require(methodName != null, {
     val err = "Authentication method name can't be null"
@@ -31,10 +31,9 @@ sealed abstract class BindCmd(val methodName: String, val params: Seq[String],
 
   override def saveState: JVal = {
     val json = Json.obj("method" -> JStr(methodName),
-      "params" -> JArr(params.map(JStr(_)).toArray),
-      "attempts" -> JNum(attempts))
+      "params" -> JArr(params.map(JStr(_)).toArray))
     if (attempts > 0) {
-      json + ("attempts" -> JNum(attempts)) + ("errorKey" -> JStr(errorKey))
+      json + ("attempts" -> JNum(attempts))
     } else {
       json
     }
@@ -68,21 +67,20 @@ sealed abstract class BindCmd(val methodName: String, val params: Seq[String],
 
 }
 
-final case class FirstBindCmd(override val methodName: String, override val params: Seq[String])
-  extends BindCmd(methodName, params) {}
+final case class FirstBindCommand(override val methodName: String, override val params: Seq[String])
+  extends BindCommand(methodName, params) {}
 
-final case class RebindCmd(override val methodName: String, override val params: Seq[String],
-                           override val attempts: Int, override val errorKey: String)
-  extends BindCmd(methodName, params, attempts, errorKey) {}
+final case class RebindCommand(override val methodName: String, override val params: Seq[String],
+                               override val attempts: Int)
+  extends BindCommand(methodName, params, attempts) {}
 
-object BindCmd {
+object BindCommand {
 
   private[cmd] val COMMAND_NAME = "bind"
 
-  def apply(methodName: String, params: Seq[String]) = FirstBindCmd(methodName, params)
+  def apply(methodName: String, params: Seq[String]) = FirstBindCommand(methodName, params)
 
-  def apply(bindCmd: BindCmd, errorKey: String) =
-    RebindCmd(bindCmd.methodName, bindCmd.params, bindCmd.attempts + 1, errorKey)
+  def apply(bindCmd: BindCommand) = RebindCommand(bindCmd.methodName, bindCmd.params, bindCmd.attempts + 1)
 
   private[cmd] def apply(state: JVal) = Right[String, (String, Seq[String], Int)](Tuple3(null, Seq(), 0))
     .right.flatMap(acm => (state \ "method").asOpt[String].fold[Either[String, (String, Seq[String], Int)]]{
@@ -98,8 +96,8 @@ object BindCmd {
       throw new IllegalArgumentException(err)
     case Right((method, params, attempt)) =>
       if (attempt == 0)
-        FirstBindCmd(method, params)
+        FirstBindCommand(method, params)
       else
-        RebindCmd(method, params, attempt, (state \ "errorKey").asOpt[String].getOrElse(null))
+        RebindCommand(method, params, attempt)
   }
 }
