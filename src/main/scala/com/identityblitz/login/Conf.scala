@@ -93,7 +93,8 @@ case class AuthnMethodMeta(name: String, options: Map[String, String],
   import Options._
   
   val isDefault = options.get(default).fold(false)(_.toBoolean)
-  val bindProviders = options.get(`bind-providers`).map(_.split(",")).getOrElse[Array[String]]({
+  /*todo: restore*/
+  val bindProviders = options.get("bind-providers").map(_.split(",")).getOrElse[Array[String]]({
     logger.warn(s"Configuration warning: 'bind-providers' is not specified for '$name' authentication method.")
     Array()})
     .map(pName => resolveProvider(pName))
