@@ -14,7 +14,7 @@ import com.identityblitz.login.Conf.methods
 @implicitNotFound("No implicit inbound or outbound found.")
 abstract class LoginFlow extends Handler {
 
-  private val defaultAuthnMethod = methods.get("default").map(_.name)
+  private val defaultAuthnMethod = methods.get("default").map(_._2.name)
 
   /**
    * Starts a new authentication method. If login context (LC) is not found it will be created.
@@ -48,7 +48,7 @@ abstract class LoginFlow extends Handler {
     }).asInstanceOf[String]
 
     logger.debug("Starting a new authentication method: {}", method)
-    methods.get(method).map(_.start).orElse({
+    methods.get(method).map(_._1.start).orElse({
       logger.error("The specified authentication method [{}] is not configured. Configured methods: {}",
         method, methods.keySet)
       throw new LoginException(s"the specified authentication method [$method] is not configured. Configured " +
@@ -139,7 +139,7 @@ abstract class LoginFlow extends Handler {
 
 object LoginFlow {
 
-  def apply() = Conf.loginFlow
+  /*def apply() = Conf.loginFlow*/
 
 }
 

@@ -2,10 +2,10 @@ package com.identityblitz.login.authn.method
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.error.BuiltInError._
 import com.identityblitz.login.LoginFlow
 import java.util.Collections
-import java.util
+import com.identityblitz.login.authn.cmd.Command
+import com.identityblitz.login.error.CommandException
 
 /**
  */
@@ -22,7 +22,7 @@ class PasswordBaseMethod(name: String, options: Map[String, String]) extends Aut
     req.forward(loginPage)
   }
 
-  override def DO(implicit req: InboundTransport, resp: OutboundTransport): Unit = {
+/*  override def DO(implicit req: InboundTransport, resp: OutboundTransport): Unit = {
     logger.trace("Try to authenticate by {}", name)
     (req.getParameter("login"), req.getParameter("password")) match {
       case (Some(login), Some(pswd)) =>
@@ -30,7 +30,7 @@ class PasswordBaseMethod(name: String, options: Map[String, String]) extends Aut
         /*bind(Map("USERNAME" -> login, "PASSWORD" -> pswd))*/
 
         if ("mike".equalsIgnoreCase(login) && "oracle_1".equals(pswd)) {
-          LoginFlow().success(name)
+          Conf.loginFlow.success(name)
         } else {
           //todo: thinking about error
           req.setAttribute("error", INVALID_CREDENTIALS)
@@ -43,7 +43,11 @@ class PasswordBaseMethod(name: String, options: Map[String, String]) extends Aut
         req.forward(loginPage)
     }
 
-  }
+  }*/
+
+  override def recover(cmdException: CommandException): Unit = ???
+
+  override protected def route(cmd: Command)(implicit iTr: InboundTransport, oTr: OutboundTransport): String = ???
 }
 
 object PasswordBaseMethod {

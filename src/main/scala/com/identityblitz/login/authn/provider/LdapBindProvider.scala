@@ -5,7 +5,6 @@ import com.unboundid.ldap.sdk._
 import com.unboundid.util.ssl.{TrustAllTrustManager, SSLUtil}
 import com.identityblitz.login.authn.provider.LdapBindProvider._
 import scala.collection
-import com.identityblitz.login.authn.BindRes
 import com.identityblitz.json.{JArr, JVal, JObj}
 import scala.util.Try
 import com.identityblitz.login.authn.provider.AttrType.AttrType
@@ -57,8 +56,7 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
 
   val pool = new LDAPConnectionPool(connection, initialConnections, maxConnections)
 
-  //todo: do it
-  override def bind(data: Map[String, String]): BindRes = ???
+
 
 
   /** other functions **/

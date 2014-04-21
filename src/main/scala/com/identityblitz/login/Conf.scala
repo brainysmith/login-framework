@@ -32,26 +32,6 @@ object Conf {
     throw new IllegalArgumentException(err)
   })._1
 
-/*  val binds = confService.getPropsGrouped("binds").mapValues(bindSchema => {
-    bindSchema.trim.split(";").map(bindMeta => {
-      val parts = bindMeta.trim.split(" ")
-      bps.getOrElse(parts(0), {
-        val err = s"Can't parse binds configuration: specified '${parts(0)}' bind provider is not configured"
-        logger.error(err)
-        throw new IllegalStateException(err)
-      }) -> {
-        if (parts.size > 1)
-          BindFlag.withName(parts(1))
-        else BindFlag.sufficient
-      }
-    }).ensuring(_.length > 0, {
-      val err = "Binds configuration error: some of the bind`s schema is blank"
-      logger.error(err)
-      throw new IllegalStateException(err)
-    })
-  })*/
-
-
   val methods = confService.getPropsDeepGrouped("authnMethods")
     .map({case (name, options) => AuthnMethodMeta(name, options, resolveProvider)})
     .foldLeft[collection.mutable.Map[String, (AuthnMethod, AuthnMethodMeta)]](collection.mutable.Map())(
@@ -86,7 +66,7 @@ case class ProviderMeta(name: String, options: Map[String, String]) extends Inst
 
   import Options._
 
-  override val initArgs = Array(name, options.filter(entry => !builtInOptions.contains(entry._1)))
+  override val initArgs = Array[Any](name, options.filter(entry => !builtInOptions.contains(entry._1)))
 
   override def toString: String = {
     val sb =new StringBuilder("BindProviderMeta(")
@@ -113,17 +93,19 @@ case class AuthnMethodMeta(name: String, options: Map[String, String],
   import Options._
   
   val isDefault = options.get(default).fold(false)(_.toBoolean)
-  val bindProviders = options.get(`bind-providers`).map(_.split(",")).getOrElse({
+  val bindProviders = options.get(`bind-providers`).map(_.split(",")).getOrElse[Array[String]]({
     logger.warn(s"Configuration warning: 'bind-providers' is not specified for '$name' authentication method.")
-    Array()
-  }).map(resolveProvider).filter(bp => {classOf[WithBind].isAssignableFrom(bp.getClass)})
+    Array()})
+    .map(pName => resolveProvider(pName))
+    .filter(bp => {classOf[WithBind].isAssignableFrom(bp.getClass)})
     .map(_.asInstanceOf[Provider with WithBind])
 
-  val attributesProviders = options.get(`attributes-providers`).map(_.split(",")).getOrElse(Array())
-    .map(resolveProvider).filter(bp => {classOf[WithAttributes].isAssignableFrom(bp.getClass)})
+  val attributesProviders = options.get(`attributes-providers`).map(_.split(",")).getOrElse[Array[String]](Array())
+    .map(pName => resolveProvider(pName))
+    .filter(bp => {classOf[WithAttributes].isAssignableFrom(bp.getClass)})
     .map(_.asInstanceOf[Provider with WithAttributes])
 
-  override val initArgs = Array(name, options.filter(entry => !builtInOptions.contains(entry._1)))
+  override val initArgs = Array[Any](name, options.filter(entry => !builtInOptions.contains(entry._1)))
 
   override def toString: String = {
     val sb =new StringBuilder("AuthnMethodMeta(")
@@ -133,7 +115,7 @@ case class AuthnMethodMeta(name: String, options: Map[String, String],
   }
 }
 
-private trait Instantiable[A] {
+sealed trait Instantiable[A] {
 
   def options: Map[String, String]
 

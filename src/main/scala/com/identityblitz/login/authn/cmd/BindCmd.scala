@@ -4,15 +4,13 @@ import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json._
 import com.identityblitz.login.LoggingUtils._
 import com.identityblitz.login.Conf
-import scala.util.Try
-import scala.util.Success
-import scala.util.Failure
 import com.identityblitz.login.error.CommandException
 
 /**
  */
 
-case class BindCmd(methodName: String, params: Seq[String]) extends Command {
+sealed abstract class BindCmd(val methodName: String, val params: Seq[String],
+                              val attempts: Int = 0, val errorKey: String = null) extends Command {
   import BindCmd._
 
   require(methodName != null, {
@@ -25,53 +23,83 @@ case class BindCmd(methodName: String, params: Seq[String]) extends Command {
     val err = "Params can't be null"
     logger.error(err)
     err
-  })  
+  })
 
   lazy val bindProviders = Conf.methods(methodName)._2.bindProviders
 
   override val name: String = COMMAND_NAME
 
-  override def saveState: JVal = Json.obj("method" -> JStr(methodName),
-    "params" -> JArr(params.map(JStr(_)).toArray))
+  override def saveState: JVal = {
+    val json = Json.obj("method" -> JStr(methodName),
+      "params" -> JArr(params.map(JStr(_)).toArray),
+      "attempts" -> JNum(attempts))
+    if (attempts > 0) {
+      json + ("attempts" -> JNum(attempts)) + ("errorKey" -> JStr(errorKey))
+    } else {
+      json
+    }
+  }
 
   override def execute(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Option[Command]] = {
+    logger.trace("executing bind command against following bind providers: {}", bindProviders)
     val data = params.map(name => name -> iTr.getParameter(name).getOrElse(null)).toMap
-    val bindRes = bindProviders.foldLeft[(String, Try[(JObj, Command)])](
-      "none" -> Failure(new IllegalStateException(s"No bind provider found for '$methodName' authentication method"))){
-      case (ok @ (bpName, Success(_)), _) =>
-        logger.trace("Skip the '{}' binding provider because the binding already complete successfully", bpName)
+    val bindRes = bindProviders.foldLeft[Either[String, (JObj, Option[Command])]]{
+      Left("no_bind_provider_found")
+    }{
+      case (ok @ Right(_), bp) =>
+        logger.trace("Skip the '{}' binding provider because the binding has already completed successfully", bp.name)
         ok
-      case ((bpName, err @ Failure(_)), bp) =>
-        logger.trace("Attempting to bind with '{}' bind provider", bpName)
-        val bindRes = bp.bind(data)
-        logger.trace("Result of attempting to bind with '{}' bind provider: {}", bpName, bindRes)
-        bpName -> bindRes
+      case (Left(err), bp) =>
+        logger.trace("Attempting to bind with '{}' bind provider", bp.name)
+        val iRes = bp.bind(data)
+        logger.trace("Result of attempting to bind with '{}' bind provider: {}", bp.name, iRes)
+        iRes
     }
 
     logger.debug("The final result of the binding command: {}", bindRes)
-
     bindRes match {
-      case (bpName, Success((claims, command))) =>
+      case Right((claims, command)) =>
         iTr.updatedLoginCtx(iTr.getLoginCtx.get.withClaims(claims))
-        Success(command)
-      case (_, Failure(err)) => Failure(err)
+        Right(command)
+      case Left(errKey) =>
+        Left(new CommandException(this, errKey))
     }
   }
+
 }
 
-private[cmd] object BindCmd {
+final case class FirstBindCmd(override val methodName: String, override val params: Seq[String])
+  extends BindCmd(methodName, params) {}
 
-  val COMMAND_NAME = "bind"
+final case class RebindCmd(override val methodName: String, override val params: Seq[String],
+                           override val attempts: Int, override val errorKey: String)
+  extends BindCmd(methodName, params, attempts, errorKey) {}
 
-  def apply(state: JVal) = new BindCmd((state \ "method").asOpt[String].getOrElse({
-    val err = s"Deserialization of the bind command`s state [${state.toJson}] failed: method is not specified"
-    logger.error(err)
-    throw new IllegalArgumentException(err)
-  }), (state \ "params").asOpt[Array[String]].getOrElse({
-    val err = s"Deserialization of the bind command`s state [${state.toJson}] failed: params is not specified"
-    logger.error(err)
-    throw new IllegalArgumentException(err)
-  }))
+object BindCmd {
 
+  private[cmd] val COMMAND_NAME = "bind"
 
+  def apply(methodName: String, params: Seq[String]) = FirstBindCmd(methodName, params)
+
+  def apply(bindCmd: BindCmd, errorKey: String) =
+    RebindCmd(bindCmd.methodName, bindCmd.params, bindCmd.attempts + 1, errorKey)
+
+  private[cmd] def apply(state: JVal) = Right[String, (String, Seq[String], Int)](Tuple3(null, Seq(), 0))
+    .right.flatMap(acm => (state \ "method").asOpt[String].fold[Either[String, (String, Seq[String], Int)]]{
+      Left(s"Deserialization of the bind command`s state [${state.toJson}] failed: method is not specified")
+      }{Right(_, acm._2, acm._3)})
+    .right.flatMap(acm => (state \ "params").asOpt[Array[String]].fold[Either[String, (String, Seq[String], Int)]]{
+      Left(s"Deserialization of the bind command`s state [${state.toJson}] failed: params is not specified")
+      }{Right(acm._1, _, acm._3)})
+    .right.flatMap(acm => (state \ "attempts").asOpt[Int].fold[Either[String, (String, Seq[String], Int)]]{
+    Right(acm._1, acm._2, 0)}{Right(acm._1, acm._2, _)}) match {
+    case Left(err) =>
+      logger.error(err)
+      throw new IllegalArgumentException(err)
+    case Right((method, params, attempt)) =>
+      if (attempt == 0)
+        FirstBindCmd(method, params)
+      else
+        RebindCmd(method, params, attempt, (state \ "errorKey").asOpt[String].getOrElse(null))
+  }
 }

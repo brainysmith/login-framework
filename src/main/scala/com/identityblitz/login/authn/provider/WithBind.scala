@@ -8,6 +8,6 @@ import com.identityblitz.login.authn.cmd.Command
  */
 trait WithBind {
 
-  def bind(data: Map[String, String]): Either[String, (JObj, Command)]
+  def bind(data: Map[String, String]): Either[String, (JObj, Option[Command])]
 
 }

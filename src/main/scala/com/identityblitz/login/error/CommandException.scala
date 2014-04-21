@@ -5,7 +5,7 @@ import com.identityblitz.login.LoggingUtils._
 
 /**
   */
-class CommandException(val cmd: Command, val errorKey: String) extends LoginException(errorKey, null){
+case class CommandException(cmd: Command, errorKey: String) extends LoginException(errorKey, null){
 
   require(cmd != null, {
     val err = "Command can't be null"

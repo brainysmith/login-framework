@@ -74,7 +74,7 @@ public class APServlet extends HttpServlet {
                 Conf$.MODULE$.methods()).entrySet()) {
             handlers.put(entry.getKey(), entry.getValue()._1());
         }
-        handlers.put("flow", LoginFlow.apply());
+        handlers.put("flow", Conf.loginFlow());
     }
 
     @Override
