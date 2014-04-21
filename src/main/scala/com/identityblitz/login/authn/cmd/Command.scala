@@ -37,7 +37,7 @@ object Command {
       val err = s"Deserialization of the command [$cmdStr] failed: unknown command`s name [$name]"
       logger.error(err)
       throw new IllegalArgumentException(err)
-    }).asInstanceOf)
+    }).asInstanceOf[T])
   }
 
 }
