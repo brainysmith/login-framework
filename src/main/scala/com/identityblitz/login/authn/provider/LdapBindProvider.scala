@@ -219,6 +219,7 @@ private object LdapBindProvider {
     rOrL(_)("port", Left("port is not specified in the configuration"), str => str.toInt),
     rOrL(_)("userDn", Left("userDn is not specified in the configuration"), str => str),
     rOrL(_)("autoReconnect", Right(true), str => str.toBoolean),
+    rOrL(_)("useSSL", Right(true), str => str.toBoolean),
     rOrL(_)("initialConnections", Right(1), str => str.toInt),
     rOrL(_)("maxConnections", Right(5), str => str.toInt)  
   )
