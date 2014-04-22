@@ -70,12 +70,8 @@ object APController extends Controller {
       implicit val otr = PlayOutboundTransport.apply
       implicit val itr = PlayInboundTransport(otr)
 
-      if(ifNotDirectCall(request)) {
-        itr.setAttribute(FlowAttrName.CALLBACK_URI_NAME, itr.getParameter(FlowAttrName.CALLBACK_URI_NAME).get)
-        itr.setAttribute(FlowAttrName.AUTHN_METHOD_NAME, itr.getParameter(FlowAttrName.AUTHN_METHOD_NAME).get)
-      }
       itr.setAttribute(FlowAttrName.HTTP_METHOD, "GET")
-      invokeHandler(handler)
+      invokeHandler(handler, ifNotDirectCall(request))
       otr.result
     }
   }
@@ -89,26 +85,29 @@ object APController extends Controller {
    */
   def doPost(handler: String) = SCSEnabledAction.async(parse.urlFormEncoded) {
     implicit request => {
+      implicit val postParams = request.body
       implicit val otr = PlayOutboundTransport.apply
       implicit val itr = PlayInboundTransport(otr)
 
-      if(ifNotDirectCall(request)) {
-        itr.setAttribute(FlowAttrName.CALLBACK_URI_NAME, itr.getParameter(FlowAttrName.CALLBACK_URI_NAME).get)
-        itr.setAttribute(FlowAttrName.AUTHN_METHOD_NAME, itr.getParameter(FlowAttrName.AUTHN_METHOD_NAME).get)
-      }
       itr.setAttribute(FlowAttrName.HTTP_METHOD, "POST")
-      invokeHandler(handler)
+      invokeHandler(handler, ifNotDirectCall(request))
       otr.result
     }
   }
 
   private def ifNotDirectCall(req: RequestHeader): Boolean = req.path.startsWith(loginPath)
 
-  private def invokeHandler(handler: String)(implicit itr: InboundTransport, otr: OutboundTransport) {
+  private def invokeHandler(handler: String, notDirectCall: Boolean)(implicit itr: InboundTransport, otr: OutboundTransport) {
     val matcher: Matcher = pattern.matcher(handler)
     if (matcher.find) {
       val method: String = matcher.group(1)
       val action: String = matcher.group(2)
+
+      if("flow".equals(method) && notDirectCall) {
+        itr.setAttribute(FlowAttrName.CALLBACK_URI_NAME, itr.getParameter(FlowAttrName.CALLBACK_URI_NAME).get)
+        itr.getParameter(FlowAttrName.AUTHN_METHOD_NAME).foreach(itr.setAttribute(FlowAttrName.AUTHN_METHOD_NAME, _))
+      }
+
       try {
         if ("/do".equalsIgnoreCase(action))
           handlers(method).asInstanceOf[AuthnMethod].DO
