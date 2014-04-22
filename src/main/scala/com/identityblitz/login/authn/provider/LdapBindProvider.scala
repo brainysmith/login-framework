@@ -5,22 +5,24 @@ import com.unboundid.ldap.sdk._
 import com.unboundid.util.ssl.{TrustAllTrustManager, SSLUtil}
 import com.identityblitz.login.authn.provider.LdapBindProvider._
 import scala.collection
-import com.identityblitz.json.{JStr, JArr, JVal, JObj}
+import com.identityblitz.json._
 import scala.util.Try
 import com.identityblitz.login.authn.provider.AttrType.AttrType
 import com.identityblitz.login.authn.cmd.{ChangePswdCmd, Command}
-import com.unboundid.ldap.sdk.controls.{PasswordExpiredControl, PasswordExpiringControl}
-import com.identityblitz.login.authn.method.PasswordBaseMethod.FormParams._
-import com.identityblitz.login.error.BuiltInError
+import com.unboundid.ldap.sdk.controls.PasswordExpiredControl
+import com.identityblitz.login.authn.method.PasswordBaseMethod.FormParams
+import com.identityblitz.login.error.{LoginError, BuiltInError}
 import scala.util.Failure
 import scala.Some
 import scala.util.Success
+import com.identityblitz.login.error.CustomLoginError
+import com.unboundid.ldap.sdk.extensions.{PasswordModifyExtendedResult, PasswordModifyExtendedRequest}
 
 /**
  */
-class LdapBindProvider(name:String, options: Map[String, String]) extends Provider(name, options) with WithBind {
+class LdapBindProvider(name:String, options: Map[String, String]) extends Provider(name, options) with WithBind with WithChangePswd {
 
-  logger.trace("initializing the ldap authentication module [options={}]", options)
+  logger.trace("initializing the ldap bind provider [options={}]", options)
 
   private val confMap = paramsMeta.foldLeft[(List[String], collection.mutable.Map[String, Any])]((List(), collection.mutable.Map()))(
     (res, f) => f(options) match {
@@ -34,105 +36,86 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
       throw new IllegalArgumentException(errors mkString ", ")
   }
 
-  private val host = confMap("host").asInstanceOf[String]
-
-  private val port = confMap("port").asInstanceOf[Int]
-
   private val userDnPtn = confMap("userDn").asInstanceOf[String]
 
-  private val useSSL = confMap("useSSL").asInstanceOf[Boolean]
+  private val pool = {
+    val host = confMap("host").asInstanceOf[String]
+    val port = confMap("port").asInstanceOf[Int]
+    val connectionOption = new LDAPConnectionOptions()
+    connectionOption.setAutoReconnect(confMap("autoReconnect").asInstanceOf[Boolean])
 
-  private val autoReconnect = confMap("autoReconnect").asInstanceOf[Boolean]
+    val connection: LDAPConnection = confMap("useSSL").asInstanceOf[Boolean] match {
+      case true =>
+        val sslUtil = new SSLUtil(new TrustAllTrustManager())
+        new LDAPConnection(sslUtil.createSSLSocketFactory(), connectionOption, host, port)
+      case false =>
+        new LDAPConnection(connectionOption, host, port)
+    }
 
-  private val initialConnections = confMap("initialConnections").asInstanceOf[Int]
-
-  private val maxConnections = confMap("maxConnections").asInstanceOf[Int]
-
-  private val connectionOption = new LDAPConnectionOptions()
-
-  connectionOption.setAutoReconnect(autoReconnect)
-
-  val connection: LDAPConnection = useSSL match {
-    case true =>
-      val sslUtil = new SSLUtil(new TrustAllTrustManager())
-      new LDAPConnection(sslUtil.createSSLSocketFactory(), connectionOption, host, port)
-    case false =>
-      new LDAPConnection(connectionOption, host, port)
+    val initialConnections = confMap("initialConnections").asInstanceOf[Int]
+    val maxConnections = confMap("maxConnections").asInstanceOf[Int]
+    new LDAPConnectionPool(connection, initialConnections, maxConnections)
   }
 
-  val pool = new LDAPConnectionPool(connection, initialConnections, maxConnections)
+  /** bossiness functions **/
 
-
-  override def bind(data: Map[String, String]): Either[String, (JObj, Option[Command])] = {
-    data.get(login).map(lgnVal => interpolate(userDnPtn, Map(login.toString -> lgnVal))) -> data.get(password) match {
+  override def bind(data: Map[String, String]): Either[LoginError, (Option[JObj], Option[Command])] = {
+    val userDnOpt = data.get(FormParams.login).map(lgnVal => interpolate(userDnPtn, Map(FormParams.login.toString -> lgnVal)))
+    logger.trace("Try to bind to '{}' LDAP [userDN = {}]", name, userDnOpt)
+    userDnOpt -> data.get(FormParams.password) match {
       case (Some(userDn), Some(pswd)) =>
         Try(pool.getConnection) match {
           case Success(c) =>
+            logger.trace("LDAP connection has been got from the pool [userDn = {}]", userDn)
             implicit val connection = c
-            logger.trace("LDAP connection has been got from the pool")
-            val authRes = Try({
-              val bindRes = bindToLdap(userDn, pswd)
-              logger.trace("Analyzing LDAP server's response controls [controls: {}, messageId: {}]",
-                bindRes.getResponseControls, bindRes.getMessageID)
-              var isPswdExpired = false
-              bindRes.getResponseControls.foreach(control => {
-                logger.trace("Got a control [name={}, oid={}]", control.getControlName, control.getOID)
-                control match {
-                  case expiringControl: PasswordExpiringControl =>
-                    logger.trace("The subject's password will expire in the near future [after {} sec]",
-                      expiringControl.getSecondsUntilExpiration)
-                    /*todo: restore warn*/
-                    /*                    lc.withWarn(NEAR_PSWD_EXPIRE_WARN_KEY, Messages(NEAR_PSWD_EXPIRE_WARN_KEY,
-                                                              expiringControl.getSecondsUntilExpiration/60/60/24))*/
-                  case expiredControl: PasswordExpiredControl =>
-                    //todo: analise what is it "isCritical"
-                    logger.trace("Bind is successful, but the subject's password has expired: to continue the " +
-                      "authentication the subject must change its password.")
-                    isPswdExpired = true
-                  case _ =>
-                    logger.debug("Unknown control, do nothing [name={}, oid={}]", control.getControlName,
-                      control.getOID)
-                }
-              })
-
-              logger.trace("Getting the subject's entry [userDn: {}]", userDn)
-              val claims = Option(connection.getEntry(userDn)).fold[JObj]({
-                logger.trace("Can't get the subject's entry: check the LDAP access rules. The subject must have " +
-                  "an access to his entry.")
-                throw new IllegalAccessException("Can't get the subject's entry: check the LDAP access rules. " +
-                  "The subject must have an access to his entry.")
-              })(entry => {
-                /*todo: getting the real attributtes*/
-                JObj("attribute1" -> JStr("value1"))
-              })
-
-              if (isPswdExpired) {
-                Right((claims, Some(new ChangePswdCmd(userDn))))
-              } else {
-                Right((claims, None))
+            val resWrapped = Try {
+              bindToLdap(userDn, pswd) match {
+                case Right(bindRes) =>
+                  logger.trace("Bind is successfully. Analyzing LDAP server's response controls " +
+                    "[userDn = {}, bindRes = {}]", Array(userDn, bindRes.getResponseControls, bindRes.getMessageID))
+                  bindRes.getResponseControls.find(
+                    control =>classOf[PasswordExpiredControl].isAssignableFrom(control.getClass)
+                  ) match {
+                      //todo: add logic for expiring password
+                    case Some(control) =>
+                      logger.trace("The user's password has expired [userDn = {}]", userDn)
+                      Right[LoginError, (Option[JObj], Option[Command])](None -> Some(new ChangePswdCmd(name, userDn)))
+                    case None =>
+                      logger.trace("Try to get user's attributes [userDn = {}]", userDn)
+                      val claims = Option(connection.getEntry(userDn)).fold[JObj]({
+                        logger.error("Can't get the subject's entry: check the LDAP access rules. The subject must have " +
+                          "an access to his entry [userDn = {}].", userDn)
+                        throw new IllegalAccessException("Can't get the subject's entry: check the LDAP access rules. " +
+                          "The subject must have an access to his entry.")
+                      })(entry => {
+                        /*todo: getting the real attributtes*/
+                        JObj("attribute1" -> JStr("value1"))
+                      })
+                      logger.trace("Got following claims [userDn = {}]: {}", userDn, claims.toJson)
+                      Right[LoginError, (Option[JObj], Option[Command])](Some(claims) -> None)
+                  }
+                case Left(err) =>
+                  logger.debug("Bind to LDAP is performed unsuccessfully [userDn = {}]: {}", userDn, err)
+                  Left[LoginError, (Option[JObj], Option[Command])](errorMapper.get(err.getResultCode).getOrElse({
+                    CustomLoginError(err.getResultCode.getName.replaceAll(" ", "_"))
+                  }))
               }
-            })
+            }
 
-            //release the connection
+            /** release the connection **/
             pool.releaseConnection(connection)
-            logger.trace("LDAP connection has been released")
+            logger.trace("LDAP connection has been released [userDn = {}]", userDn)
 
-            authRes match {
-              case Success(res) =>
-                logger.trace("authentication by LDAP is completed successfully [userDn: {}, res={}]", userDn, res)
-                res
+            logger.debug("The result of the binding to LDAP [userDn = {}]: {}", userDn, resWrapped)
+            /** analyze the result **/
+            resWrapped match {
+              case Success(res) => res
               case Failure(e) =>
-                logger.trace("authentication by LDAP is failed [userName: {}, error: {}]", userDn, e)
-                e match {
-                  case le: LDAPException =>
-                    Left(handleLdapError(le.toLDAPResult))
-                  case _ =>
-                    logger.error("can't perform authentication by LDAP server. Internal error has occurred: {}", e)
-                    Left(BuiltInError.INTERNAL)
-                }
+                logger.error("Internal exception has occurred [userDn = {}]: {}", userDn, e.getMessage)
+                throw e
             }
           case Failure(e) =>
-            logger.error("Bind to LDAP error: can't get a LDAP connection from the pool")
+            logger.error("Can't get a LDAP connection from the pool [userDn = {}]", userDn)
             throw e
         }
       case _ =>
@@ -141,56 +124,59 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
     }    
   }
 
+  override def changePswd(userDn: String, curPswd: String, newPswd: String): Either[LoginError, Option[Command]] = {
+    Try(pool.getConnection) match {
+      case Success(c) =>
+        logger.trace("LDAP connection has been got from the pool [userDn = {}]", userDn)
+        implicit val connection = c
+        val pswdMdfRes = Try({
+          /** first of all try to bind **/
+          bindToLdap(userDn, curPswd) match {
+            case Right(bindRes) =>
+              logger.trace("Bind to LDAP is performed successfully. Try to change password [userDn: {}]", userDn)
+              val pswdMdfReq = new PasswordModifyExtendedRequest(curPswd, newPswd)
+              connection.processExtendedOperation(pswdMdfReq).asInstanceOf[PasswordModifyExtendedResult]
+            case Left(err) =>
+              //todo: think how to unify with bind
+              logger.debug("Bind to LDAP is performed unsuccessfully [userDn = {}]: {}", userDn, err)
+              Left[LoginError, (Option[JObj], Option[Command])](errorMapper.get(err.getResultCode).getOrElse({
+                CustomLoginError(err.getResultCode.getName.replaceAll(" ", "_"))
+              }))
+          }
+        })
+
+
+
+        pool.releaseConnection(connection)
+        logger.trace("LDAP connection has been released [userDn = {}]", userDn)
+
+        ???
+      case Failure(e) =>
+        logger.error("Can't get a ldap connection from the pool: {}", e.getMessage)
+        throw e
+    }
+
+  }
 
   /** other functions **/
-  private def bindToLdap(userDn: String, pswd: String)(implicit connection: LDAPConnection): BindResult = {
-    logger.trace("Try to bind to LDAP server with following userDn: {}", userDn)
-    
+  private def bindToLdap(userDn: String, pswd: String)(implicit connection: LDAPConnection): Either[LDAPException, BindResult] = {
     Try[BindResult](connection.bind(new SimpleBindRequest(userDn, pswd))).map[BindResult](bindRes => {
       if (!bindRes.getResultCode.isConnectionUsable) {
-        logger.error("Can't bind to LDAP server: the connection isn't usable [resultCode: {}, messageId: {}, " +
-          "diagnosticMessage: {}]", Array(bindRes.getResultCode, bindRes.getMessageID, bindRes.getDiagnosticMessage))
+        logger.error("Can't bind to LDAP server: the connection isn't usable [userDn = {}, resultCode = {}, " +
+          "messageId = {}, diagnosticMessage = {}]",
+          Array(userDn, bindRes.getResultCode, bindRes.getMessageID, bindRes.getDiagnosticMessage))
         throw new RuntimeException("Can't bind to LDAP server: the connection isn't usable")
       } else {
         bindRes
       }      
     }) match {
-      case Success(bindRes) =>
-        logger.debug("Bind to LDAP server is successful [userDn: {}, messageId: {}]", userDn, bindRes.getMessageID)
-        bindRes
+      case Success(bindRes) => Right(bindRes)
+      case Failure(ldapException:LDAPException) => Left(ldapException)
       case Failure(e) =>
-        logger.error("Can't bind to LDAP server: internal error has occurred [{}]", e.getMessage)
+        logger.error("Can't perform bind to LDAP. Internal error has occurred: {}", e.getMessage)
         throw e
     }
   }
-
-  private def handleLdapError(err: LDAPResult): String = {
-    logger.debug("Handling ldap error: [{resultCode: {}, messageId: {}, diagnosticMessage: {}}]",
-      Array(err.getResultCode.getName, err.getMessageID, err.getDiagnosticMessage))
-    errorMapper.get(err.getResultCode).map(_.toString).getOrElse(err.getResultCode.getName.replaceAll(" ", "_"))
-
-    /*todo: restore logic*/
-/*    var isErrorResolvedByControl = false
-    err.getResponseControls.map(control => {
-      logger.trace("got a control [name: {}, oid: {}]", control.getControlName, control.getOID)
-      control match {
-        case expiredControl: PasswordExpiredControl =>
-          //todo: check is it possible to change password in this case
-          logger.trace("the subject's password has expired, adding the appropriate error")
-          lc withError PASSWORD_EXPIRED
-          isErrorResolvedByControl = true
-        case _ => {
-          logger.debug("unknown control, do nothing [name={}, oid={}]", control.getControlName, control.getOID)
-        }
-      }
-    })
-
-    if (!isErrorResolvedByControl) {
-      logger.trace("map result code to error [result code ={}]", err.getResultCode)
-      errorMapper.get(err.getResultCode).getOrElse(err.getResultCode.getName.replaceAll(" ", "_"))
-    }*/
-  }
-
 
   private def interpolate(text: String, vars: Map[String, String]) =
     (text /: vars) { (t, kv) => t.replace("${"+kv._1+"}", kv._2)  }
@@ -224,7 +210,6 @@ private object LdapBindProvider {
     rOrL(_)("maxConnections", Right(5), str => str.toInt)  
   )
 
-  //todo: add mapper for password expired
   val errorMapper = Map(ResultCode.NO_SUCH_OBJECT -> BuiltInError.NO_SUBJECT_FOUND,
     ResultCode.INVALID_CREDENTIALS -> BuiltInError.INVALID_CREDENTIALS,
     ResultCode.UNWILLING_TO_PERFORM -> BuiltInError.ACCOUNT_IS_LOCKED)

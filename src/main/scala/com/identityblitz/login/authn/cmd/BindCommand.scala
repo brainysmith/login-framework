@@ -4,7 +4,7 @@ import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json._
 import com.identityblitz.login.LoggingUtils._
 import com.identityblitz.login.Conf
-import com.identityblitz.login.error.CommandException
+import com.identityblitz.login.error.{CustomLoginError, LoginError, CommandException}
 
 /**
  */
@@ -42,9 +42,11 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
   override def execute(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Option[Command]] = {
     logger.trace("executing bind command against following bind providers: {}", bindProviders)
     val data = params.map(name => name -> iTr.getParameter(name).getOrElse(null)).toMap
-    val bindRes = bindProviders.foldLeft[Either[String, (JObj, Option[Command])]]{
-      Left("no_bind_provider_found")
-    }{
+    val bindRes = bindProviders.ensuring(!_.isEmpty, {
+        val err = s"No bind provider found [authentication method = $methodName]. Check the configuration."
+        logger.error(err)
+        throw new IllegalStateException(err)}
+    ).foldLeft[Either[LoginError, (Option[JObj], Option[Command])]]{Left(CustomLoginError("no_provider_found"))}{
       case (ok @ Right(_), bp) =>
         logger.trace("Skip the '{}' binding provider because the binding has already completed successfully", bp.name)
         ok
@@ -57,14 +59,19 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
 
     logger.debug("The final result of the binding command: {}", bindRes)
     bindRes match {
-      case Right((claims, command)) =>
-        iTr.updatedLoginCtx(iTr.getLoginCtx.get.withClaims(claims))
+      case Right((claimsWrapped, command)) =>
+        claimsWrapped.map(claims => iTr.updatedLoginCtx(iTr.getLoginCtx.get.withClaims(claims)))
         Right(command)
       case Left(errKey) =>
         Left(new CommandException(this, errKey))
     }
   }
 
+  override def toString: String = new StringBuilder(this.getClass.getSimpleName)
+    .append("(")
+    .append(saveState.toJson)
+    .append(")")
+    .toString()
 }
 
 final case class FirstBindCommand(override val methodName: String, override val params: Seq[String])
