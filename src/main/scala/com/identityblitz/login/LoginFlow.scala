@@ -3,7 +3,7 @@ package com.identityblitz.login
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoggingUtils._
 import scala.annotation.implicitNotFound
-import com.identityblitz.login.error.LoginException
+import com.identityblitz.login.error.{LoginError, LoginException}
 import com.identityblitz.login.FlowAttrName._
 import com.identityblitz.login.Conf.methods
 
@@ -81,7 +81,7 @@ abstract class LoginFlow extends Handler {
    * @param iTr - inbound transport
    * @param oTr - outbound transport
    */
-  final def fail(method: String, cause: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+  final def fail(method: String, cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     implicit val lc = iTr.getLoginCtx.get
     logger.trace("An authentication method {} has been completed not successfully. Getting a nex point ...", method)
     nextForFail(cause)
@@ -108,7 +108,7 @@ abstract class LoginFlow extends Handler {
    * @param iTr - inbound transport
    * @param oTr - outbound transport
    */
-  final protected def endWithError(cause: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+  final protected def endWithError(cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     logger.debug("The login flow complete with error [{}] redirect to the following callback url: {}",
       cause, iTr.getLoginCtx.get.callbackUri)
     //todo: add the error to the result
@@ -134,7 +134,7 @@ abstract class LoginFlow extends Handler {
    * @param iTr - inbound transport
    * @param oTr - outbound transport
    */
-  protected def nextForFail(cause: String)(implicit iTr: InboundTransport, oTr: OutboundTransport)
+  protected def nextForFail(cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport)
 }
 
 object LoginFlow {
@@ -145,7 +145,7 @@ object LoginFlow {
 
 private[login] object BuiltInLoginFlow extends LoginFlow {
 
-  override protected def nextForFail(cause: String)(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
+  override protected def nextForFail(cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
     endWithError(cause)
   }
 

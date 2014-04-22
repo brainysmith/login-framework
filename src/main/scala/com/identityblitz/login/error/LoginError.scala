@@ -3,9 +3,23 @@ package com.identityblitz.login.error
 import com.identityblitz.lang.scala.CustomEnumeration
 
 
-sealed abstract class BuiltInError(private val _name: String) extends BuiltInError.Val {
-  def name = _name
-  def getKey: String = "BuildInErrors." + name
+trait LoginError {
+
+  def name: String
+
+  def params: Seq[String]
+
+
+  override def toString: String = new StringBuilder("LoginError(name=")
+    .append(name)
+    .append(", params=").append(params)
+    .append(")")
+    .toString()
+}
+
+case class CustomLoginError(name: String, params: Seq[String] = Seq()) extends LoginError
+
+sealed abstract class BuiltInError(val name: String, val params: Seq[String] = Seq()) extends BuiltInError.Val with LoginError {
 }
 
 /**

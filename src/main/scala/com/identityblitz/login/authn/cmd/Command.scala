@@ -24,7 +24,8 @@ trait Command {
 object Command {
 
   private val cmdMap = Map[String, (JVal => Command)](
-    BindCommand.COMMAND_NAME -> {(state: JVal) => BindCommand(state)}
+    BindCommand.COMMAND_NAME -> {(state: JVal) => BindCommand(state)},
+    ChangePswdCmd.COMMAND_NAME -> {(state: JVal) => ChangePswdCmd(state)}
   )
 
   def apply[T <: Command](cmdStr: String): T = {

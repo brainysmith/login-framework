@@ -3,7 +3,7 @@ package com.identityblitz.login.authn.method
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoggingUtils._
 import com.identityblitz.login.authn.cmd.{BindCommand, Command}
-import com.identityblitz.login.error.CommandException
+import com.identityblitz.login.error.{BuiltInError, CommandException}
 import com.identityblitz.login.authn.method.PasswordBaseMethod.FormParams
 
 /**
@@ -27,38 +27,19 @@ class PasswordBaseMethod(name: String, options: Map[String, String]) extends Aut
 
   override protected def recover(cmdException: CommandException)
                                 (implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    addError(cmdException.errorKey)
-    cmdException.cmd match {
-      case bindCmd: BindCommand => Right(Some(BindCommand(bindCmd)))
+    import BuiltInError._
+    addError(cmdException.error.name)
+    cmdException.cmd -> cmdException.error match {
+      case (bindCmd: BindCommand, INVALID_CREDENTIALS | NO_SUBJECT_FOUND | NO_CREDENTIALS_FOUND) =>
+        Right(Some(BindCommand(bindCmd)))
+      case _ =>
+        Left(cmdException)
     }
   }
 
   private def addError(error: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    iTr.setAttribute(FormParams.error, error)
+    iTr.setAttribute("error", error)
   }
-
-/*  override def DO(implicit req: InboundTransport, resp: OutboundTransport): Unit = {
-    logger.trace("Try to authenticate by {}", name)
-    (req.getParameter("login"), req.getParameter("password")) match {
-      case (Some(login), Some(pswd)) =>
-
-        /*bind(Map("USERNAME" -> login, "PASSWORD" -> pswd))*/
-
-        if ("mike".equalsIgnoreCase(login) && "oracle_1".equals(pswd)) {
-          Conf.loginFlow.success(name)
-        } else {
-          //todo: thinking about error
-          req.setAttribute("error", INVALID_CREDENTIALS)
-          req.forward(loginPage)
-        }
-      case _ =>
-        logger.debug("parameter login or password not specified")
-        //todo: thinking about error
-        req.setAttribute("error", NO_CREDENTIALS_FOUND)
-        req.forward(loginPage)
-    }
-
-  }*/
 }
 
 object PasswordBaseMethod {
@@ -67,7 +48,7 @@ object PasswordBaseMethod {
     import scala.language.implicitConversions
 
     type Options = Value
-    val login, password, error = Value
+    val login, password = Value
 
     implicit def valueToString(v: Value): String = v.toString
 
