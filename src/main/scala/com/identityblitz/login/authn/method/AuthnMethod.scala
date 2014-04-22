@@ -62,7 +62,7 @@ abstract class AuthnMethod(val name:String, val options: Map[String, String]) ex
   @throws(classOf[LoginException])
   final def DO(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     iTr.getParameter(FlowAttrName.COMMAND)
-      .map[Command](Command(_))
+      .map[Command](Command[Command])
       .map(_.execute)
       .map(res => res.left.flatMap(recover) match {
           case Left(cmdException) => Conf.loginFlow.fail(name, cmdException.errorKey)

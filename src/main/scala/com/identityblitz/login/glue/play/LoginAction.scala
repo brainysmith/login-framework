@@ -128,6 +128,9 @@ object APController extends Controller {
 
 }
 
+/**
+ * The action to add another action ability to be forwarded to.
+ */
 object Forwardable extends ActionBuilder[Request] {
 
   def invokeBlock[A](request: Request[A], block: (Request[A]) => Future[SimpleResult]): Future[SimpleResult] = {
