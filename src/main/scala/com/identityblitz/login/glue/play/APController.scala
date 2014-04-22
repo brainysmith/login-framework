@@ -5,14 +5,15 @@ import scala.concurrent.{Promise, Future}
 import play.api.libs.iteratee.Done
 import com.identityblitz.scs.glue.play.{SCSEnabledAction, SCSRequest}
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
-import com.identityblitz.login.error.{LoginException, TransportException}
+import com.identityblitz.login.error.TransportException
 import play.api.Play
-import com.identityblitz.login.{Conf, FlowAttrName, LoginContext, Platform}
+import com.identityblitz.login._
 import play.api.mvc.Results._
-import play.api.mvc.SimpleResult
 import play.api.Play.current
-import java.util.regex.{Pattern, Matcher}
+import java.util.regex.Pattern
 import com.identityblitz.login.authn.method.AuthnMethod
+import play.api.mvc.SimpleResult
+import scala.util.{Failure, Success, Try}
 
 /**
  * The Authentication Point (AP) controller is the endpoint for Play applications written on Scala language
@@ -50,13 +51,11 @@ import com.identityblitz.login.authn.method.AuthnMethod
  * </table>
  */
 object APController extends Controller {
-  private final val pattern: Pattern = Pattern.compile("([^/]+)(/do)?", Pattern.CASE_INSENSITIVE)
 
   val loginPath = "/login/"
 
-  val handlers: Map[String, com.identityblitz.login.Handler] = Conf.methods.mapValues(_._1
-    .asInstanceOf[com.identityblitz.login.Handler]) +
-    ("flow" -> Conf.loginFlow.asInstanceOf[com.identityblitz.login.Handler])
+  val authMethods: Map[String, AuthnMethod] = Conf.methods.mapValues(_._1)
+  val flowEngine = Conf.loginFlow
 
   /**
    * The entry point action of the AP for request made by HTTP method GET. For this action the specific route
@@ -71,8 +70,12 @@ object APController extends Controller {
       implicit val itr = PlayInboundTransport(otr)
 
       itr.setAttribute(FlowAttrName.HTTP_METHOD, "GET")
-      invokeHandler(handler, ifNotDirectCall(request))
-      otr.result
+      invokeHandler(handler, ifDirectCall(request)) match {
+        case Success(_) => otr.result
+        case Failure(e) =>
+          e.printStackTrace()
+          Future.successful(Results.InternalServerError(e.getMessage))
+      }
     }
   }
 
@@ -90,45 +93,57 @@ object APController extends Controller {
       implicit val itr = PlayInboundTransport(otr)
 
       itr.setAttribute(FlowAttrName.HTTP_METHOD, "POST")
-      invokeHandler(handler, ifNotDirectCall(request))
-      otr.result
+      invokeHandler(handler, ifDirectCall(request)) match {
+        case Success(_) => otr.result
+        case Failure(e) =>
+          e.printStackTrace()
+          Future.successful(Results.InternalServerError(e.getMessage))
+      }
     }
   }
 
-  private def ifNotDirectCall(req: RequestHeader): Boolean = req.path.startsWith(loginPath)
+  private def ifDirectCall(req: RequestHeader): Boolean = !req.path.startsWith(loginPath)
 
-  private def invokeHandler(handler: String, notDirectCall: Boolean)(implicit itr: InboundTransport, otr: OutboundTransport) {
-    val matcher: Matcher = pattern.matcher(handler)
-    if (matcher.find) {
-      val method: String = matcher.group(1)
-      val action: String = matcher.group(2)
-
-      if("flow".equals(method) && notDirectCall) {
-        itr.setAttribute(FlowAttrName.CALLBACK_URI_NAME, itr.getParameter(FlowAttrName.CALLBACK_URI_NAME).get)
-        itr.getParameter(FlowAttrName.AUTHN_METHOD_NAME).foreach(itr.setAttribute(FlowAttrName.AUTHN_METHOD_NAME, _))
-      }
-
-      try {
-        if ("/do".equalsIgnoreCase(action))
-          handlers(method).asInstanceOf[AuthnMethod].DO
-        else
-          handlers(method).start
-      }
-      catch {
-        case e: LoginException => {
-          throw new Error(e)
-        }
+  private def invokeHandler(handler: String, directCall: Boolean)(implicit itr: InboundTransport, otr: OutboundTransport): Try[Unit] = {
+    Try[Unit] {
+      Call(handler, directCall) match {
+        case Call("flow", null, true) => flowEngine.start
+        case Call("flow", null, false) =>
+          itr.setAttribute(FlowAttrName.CALLBACK_URI_NAME, itr.getParameter(FlowAttrName.CALLBACK_URI_NAME).fold[String]{
+            LoggingUtils.logger.error("callback_uri is not specified.")
+            throw new IllegalArgumentException("callback_uri is not specified.")
+          }(s => s))
+          itr.getParameter(FlowAttrName.AUTHN_METHOD_NAME).foreach(itr.setAttribute(FlowAttrName.AUTHN_METHOD_NAME, _))
+          flowEngine.start
+        case Call(m, "/do", _) => authMethods(m).DO
+        case c @ Call(_, _, _) =>
+          LoggingUtils.logger.error("Got a wrong call: {}.", c)
+          throw new IllegalArgumentException("Got a wrong call: " + c + ".")
       }
     }
-    else {
-      throw new IllegalStateException("No matches for handler: " + handler)
+  }
+
+  private class Call(private val handler: String, private val directCall: Boolean) {
+    private final val pattern: Pattern = Pattern.compile("([^/]+)(/do)?", Pattern.CASE_INSENSITIVE)
+
+    val (method, action) = Option(pattern.matcher(handler)).filter(_.find())
+      .fold[(String, String)]{
+      LoggingUtils.logger.error("Got wrong handler: {}.", handler)
+      throw new Error("Got wrong handler: " + handler + ".")
+    }(m => (m.group(1), m.group(2)))
+  }
+
+  private object Call {
+    def apply(handler: String, directCall: Boolean) = new Call(handler, directCall)
+    def unapply(call: Call): Option[(String, String, Boolean)] = {
+      Option(call).map(c => (call.method, call.action, call.directCall))
     }
   }
 
 }
 
 /**
- * The action to add another action ability to be forwarded to.
+ * The action to add another action ability to be forwardable.
  */
 object Forwardable extends ActionBuilder[Request] {
 
