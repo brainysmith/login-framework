@@ -2,7 +2,8 @@ package com.identityblitz.login.authn.cmd
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json._
-import com.identityblitz.login.error.{BuiltInError, CommandException}
+import com.identityblitz.login.error.CommandException
+import com.identityblitz.login.error.BuiltInErrors._
 import com.identityblitz.login.LoggingUtils._
 import com.identityblitz.login.Conf
 import com.identityblitz.login.authn.provider.{Provider, WithChangePswd}
@@ -34,15 +35,20 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
   
   override val name: String = COMMAND_NAME
 
-  override def execute(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Option[Command]] = {
+
+  override def execute(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     logger.trace("executing change password command against following bind provider: {}", providerName)
     (iTr.getParameter("currentPassword"), iTr.getParameter("newPassword")) match {
       case (Some(curPswd), Some(newPswd)) =>
-        provider.changePswd(userId, curPswd, newPswd).left.map(CommandException(this, _))
+        provider.changePswd(userId, curPswd, newPswd).left.map(CommandException(this, _)).right.map{
+          case (claimsWrapped, cmd) =>
+            claimsWrapped.map(claims => iTr.updatedLoginCtx(iTr.getLoginCtx.get.withClaims(claims)))
+            cmd
+        }
       case _ =>
         logger.warn("Can't perform change password [userId = {}]: current or new passwords is not specified in " +
           "the request", userId)
-        Left(CommandException(this, BuiltInError.NO_CREDENTIALS_FOUND))
+        Left(CommandException(this, NO_CREDENTIALS_FOUND))
     }
   }
 
@@ -57,9 +63,9 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
   }
 }
 
-private[cmd] object ChangePswdCmd {
+object ChangePswdCmd {
 
-  val COMMAND_NAME = "changePswd"
+  private[cmd] val COMMAND_NAME = "changePswd"
 
   def apply(cmd: ChangePswdCmd) = new ChangePswdCmd(cmd.providerName, cmd.userId, cmd.attempts + 1)
 

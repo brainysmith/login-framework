@@ -2,8 +2,9 @@ package com.identityblitz.login.authn.method
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.authn.cmd.{BindCommand, Command}
-import com.identityblitz.login.error.{BuiltInError, CommandException}
+import com.identityblitz.login.authn.cmd.{ChangePswdCmd, BindCommand, Command}
+import com.identityblitz.login.error.CommandException
+import com.identityblitz.login.error.BuiltInErrors._
 import com.identityblitz.login.authn.method.PasswordBaseMethod.FormParams
 
 /**
@@ -21,24 +22,18 @@ class PasswordBaseMethod(name: String, options: Map[String, String]) extends Aut
     sendCommand(BindCommand(name, FormParams.allParams))
   }
 
-  override protected def route(cmd: Command)(implicit iTr: InboundTransport, oTr: OutboundTransport): String = {
-    loginPage
-  }
+  override protected def route(cmd: Command)(implicit iTr: InboundTransport, oTr: OutboundTransport): String = loginPage
 
   override protected def recover(cmdException: CommandException)
                                 (implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    import BuiltInError._
-    addError(cmdException.error.name)
     cmdException.cmd -> cmdException.error match {
       case (bindCmd: BindCommand, INVALID_CREDENTIALS | NO_SUBJECT_FOUND | NO_CREDENTIALS_FOUND) =>
         Right(Some(BindCommand(bindCmd)))
+      case (changePswdCmd: ChangePswdCmd, INVALID_CREDENTIALS | NO_CREDENTIALS_FOUND) =>
+        Right(Some(ChangePswdCmd(changePswdCmd)))
       case _ =>
         Left(cmdException)
     }
-  }
-
-  private def addError(error: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    iTr.setAttribute("error", error)
   }
 }
 

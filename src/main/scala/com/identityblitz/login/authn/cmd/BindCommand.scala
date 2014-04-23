@@ -67,11 +67,8 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
     }
   }
 
-  override def toString: String = new StringBuilder(this.getClass.getSimpleName)
-    .append("(")
-    .append(saveState.toJson)
-    .append(")")
-    .toString()
+  override def toString: String = new StringBuilder(this.getClass.getSimpleName).append("(")
+    .append(saveState.toJson).append(")").toString()
 }
 
 final case class FirstBindCommand(override val methodName: String, override val params: Seq[String])
