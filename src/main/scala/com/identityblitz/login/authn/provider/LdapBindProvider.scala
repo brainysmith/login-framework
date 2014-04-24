@@ -60,7 +60,7 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
 
   /** bossiness functions **/
 
-  override def bind(data: Map[String, String]): Either[LoginError, (Option[JObj], Option[Command])] = {
+  override def bind(data: Map[String, String]): Either[LoginError, (JObj, Option[Command])] = {
     val userDnOpt = data.get(FormParams.login).map(lgnVal => interpolate(userDnPtn, Map(FormParams.login.toString -> lgnVal)))
     logger.trace("Try to bind to '{}' LDAP [userDN = {}]", name, userDnOpt)
     userDnOpt -> data.get(FormParams.password) match {
@@ -77,7 +77,7 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
                   //todo: add logic for near expiring password
                   case Some(control) =>
                     logger.trace("The user's password has expired [userDn = {}, ldap = {}]", userDn, name)
-                    Right[LoginError, (Option[JObj], Option[Command])](None -> Some(new ChangePswdCmd(name, userDn)))
+                    Right[LoginError, (JObj, Option[Command])](JObj() -> Some(new ChangePswdCmd(name, userDn)))
                   case None =>
                     logger.trace("Try to get user's attributes [userDn = {}, ldap = {}]", userDn, name)
                     val claims = Option(connection.getEntry(userDn)).fold[JObj]({
@@ -91,7 +91,7 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
                     })
                     logger.trace("Got following claims [userDn = {}, ldap = {}]: {}",
                       Array(userDn, name, claims.toJson))
-                    Right[LoginError, (Option[JObj], Option[Command])](Some(claims) -> None)
+                    Right[LoginError, (JObj, Option[Command])](claims -> None)
                 }
               case Left(err) => Left(err)
             }

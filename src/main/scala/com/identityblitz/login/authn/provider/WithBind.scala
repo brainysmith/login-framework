@@ -9,6 +9,6 @@ import com.identityblitz.login.error.LoginError
  */
 trait WithBind {
 
-  def bind(data: Map[String, String]): Either[LoginError, (Option[JObj], Option[Command])]
+  def bind(data: Map[String, String]): Either[LoginError, (JObj, Option[Command])]
 
 }

@@ -53,8 +53,8 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
     } yield (name, value)).toMap
 
     def doBind(providers: Array[Provider with WithBind],
-               data: Map[String, String]) :Either[Seq[(String, LoginError)], (Option[JObj], Option[Command])] = {
-      providers.foldLeft[Either[Seq[(String, LoginError)], (Option[JObj], Option[Command])]]{
+               data: Map[String, String]) :Either[Seq[(String, LoginError)], (JObj, Option[Command])] = {
+      providers.foldLeft[Either[Seq[(String, LoginError)], (JObj, Option[Command])]]{
         Left(Seq(("", CustomLoginError("no_provider_found"))))}{
         case (ok @ Right(_), bp) => return ok
         case (Left(errs), bp) => bp.bind(data).left.map(e => errs :+ (bp.name, e))
@@ -63,7 +63,7 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
 
     doBind(bindProviders, data).right.map( t => {
       itr.updatedLoginCtx(itr.getLoginCtx.fold[LoginContext]{
-        throw new IllegalStateException("Login context not found.")}(_ addClaims t._1.get))
+        throw new IllegalStateException("Login context not found.")}(_ addClaims t._1))
       t._2
     }).left.map(e => {
       if(logger.isDebugEnabled)

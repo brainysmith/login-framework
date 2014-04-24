@@ -42,7 +42,7 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
       case (Some(curPswd), Some(newPswd)) =>
         provider.changePswd(userId, curPswd, newPswd).left.map(CommandException(this, _)).right.map{
           case (claimsWrapped, cmd) =>
-            claimsWrapped.map(claims => iTr.updatedLoginCtx(iTr.getLoginCtx.get.withClaims(claims)))
+            claimsWrapped.map(claims => iTr.updatedLoginCtx(iTr.getLoginCtx.get.addClaims(claims)))
             cmd
         }
       case _ =>
