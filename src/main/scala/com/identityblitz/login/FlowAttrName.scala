@@ -15,4 +15,6 @@ object FlowAttrName {
   val HTTP_METHOD = "http_method"
 
   val ERROR = "error"
+
+  val REDIRECT = "redirect"
 }

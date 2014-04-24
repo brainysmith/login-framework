@@ -189,6 +189,8 @@ private class PlayInboundTransport[A](private val otr: PlayOutboundTransport,
     }
   }
 
+  val isAjax = "XMLHttpRequest" == req.headers.get("X-Requested-With").getOrElse(null)
+
   def unwrap: AnyRef = req
 
   def platform: Platform.Platform = Platform.PLAY

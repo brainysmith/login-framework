@@ -1,5 +1,6 @@
 package com.identityblitz.login.glue.servlet;
 
+import com.identityblitz.json.JFactory;
 import com.identityblitz.login.*;
 import com.identityblitz.login.authn.method.AuthnMethod;
 import com.identityblitz.login.error.LoginException;
@@ -80,7 +81,7 @@ public class APServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         final InboundTransport itr = new ServletInboundTransport(req, resp);
-        final OutboundTransport otr = new ServletOutboundTransport(resp);
+        final OutboundTransport otr = new ServletOutboundTransport(req, resp);
         extractParameters(itr);
         itr.setAttribute(FlowAttrName$.MODULE$.HTTP_METHOD(), "GET");
         invokeHandler(itr, otr);
@@ -89,7 +90,7 @@ public class APServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         final InboundTransport itr = new ServletInboundTransport(req, resp);
-        final OutboundTransport otr = new ServletOutboundTransport(resp);
+        final OutboundTransport otr = new ServletOutboundTransport(req, resp);
         extractParameters(itr);
         itr.setAttribute(FlowAttrName$.MODULE$.HTTP_METHOD(), "POST");
         invokeHandler(itr, otr);
@@ -208,14 +209,22 @@ class ServletInboundTransport implements InboundTransport {
 class ServletOutboundTransport implements OutboundTransport {
     private final HttpServletResponse resp;
 
-    ServletOutboundTransport(final HttpServletResponse resp) {
+    private final boolean isAjax;
+
+    ServletOutboundTransport(final HttpServletRequest req, final HttpServletResponse resp) {
         this.resp = resp;
+        isAjax = "XMLHttpRequest".equals(req.getHeader("X-Requested-With"));
     }
 
     @Override
     public void redirect(String location) throws TransportException {
         try {
-            resp.sendRedirect(location);
+            if (isAjax) {
+                resp.setContentType("application/json");
+                resp.getWriter().write(JFactory.jObj("redirect", JFactory.jStr(location)).toJson());
+            } else {
+                resp.sendRedirect(location);
+            }
         } catch (IOException e) {
             logger().error("Can't send redirect [location = {}]. IOException has occurred: {}", location, e);
             throw new TransportException(e);
