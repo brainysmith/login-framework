@@ -2,7 +2,7 @@ package com.identityblitz.login.authn.method
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.{Conf, FlowAttrName, Handler}
-import com.identityblitz.login.error.{BuiltInError, CommandException, LoginException}
+import com.identityblitz.login.error.{BuiltInErrors, CommandException, LoginException}
 import com.identityblitz.login.authn.cmd.Command
 import com.identityblitz.login.LoggingUtils._
 import scala.util.control.NonFatal
@@ -51,6 +51,7 @@ abstract class AuthnMethod(val name:String, val options: Map[String, String]) ex
    * @return
    */
   final protected def sendCommand(cmd: Command)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    iTr.setAttribute(FlowAttrName.COMMAND_NAME, cmd.name)
     iTr.setAttribute(FlowAttrName.COMMAND, cmd.asString())
     iTr.forward(route(cmd))
   }
@@ -65,8 +66,9 @@ abstract class AuthnMethod(val name:String, val options: Map[String, String]) ex
   final def DO(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     try {
       val command = iTr.getParameter(FlowAttrName.COMMAND).fold[Command]{
-        logger.error("The request parameter '{}' not specified", FlowAttrName.COMMAND)
-        throw new IllegalArgumentException("")
+        val err = s"The request parameter '${FlowAttrName.COMMAND}' not specified"
+        logger.error(err)
+        throw new IllegalArgumentException(err)
       }(Command[Command])
 
       logger.trace("Try to execute a command [authnMethod = {}]: {}", name, command)
@@ -74,6 +76,7 @@ abstract class AuthnMethod(val name:String, val options: Map[String, String]) ex
       command.execute.left.flatMap(cmdException => {
         logger.debug("Execution of the command fails [authnMethod = {}, command = {}]: {}. Try to recover.",
           Array(name, command, cmdException))
+        iTr.setAttribute(FlowAttrName.ERROR, cmdException.error.name)
         recover(cmdException)
       }) match {
         case Left(cmdException) =>
@@ -90,7 +93,7 @@ abstract class AuthnMethod(val name:String, val options: Map[String, String]) ex
     } catch {
       case NonFatal(e) =>
         logger.error("During executing command an internal error has occurred [authnMethod = {}]: {}. ", name, e)
-        Conf.loginFlow.fail(name, BuiltInError.INTERNAL)
+        Conf.loginFlow.fail(name, BuiltInErrors.INTERNAL)
     }
   }
 }
