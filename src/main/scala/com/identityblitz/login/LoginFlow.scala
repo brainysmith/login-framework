@@ -6,6 +6,7 @@ import scala.annotation.implicitNotFound
 import com.identityblitz.login.error.{LoginError, LoginException}
 import com.identityblitz.login.FlowAttrName._
 import com.identityblitz.login.Conf.methods
+import com.identityblitz.login.LoginContext._
 
 /**
  * Defines a flow of the login process.
@@ -14,50 +15,44 @@ import com.identityblitz.login.Conf.methods
 @implicitNotFound("No implicit inbound or outbound found.")
 abstract class LoginFlow extends Handler {
 
-  private val defaultAuthnMethod = methods.get("default").map(_._2.name)
+  private val defaultAuthnMethod = methods.get("default").map(_._2.name).orElse{
+    logger.warn("A default login method not specified in the configuration. To fix this fix add a parameter " +
+      "'default = true' to an one authentication method")
+    None
+  }
 
   /**
    * Starts a new authentication method. If login context (LC) is not found it will be created.
-   * Call the method [[com.identityblitz.login.authn.method.AuthnMethod.start]] on the according instance of the
+   * Calls the method [[com.identityblitz.login.authn.method.AuthnMethod.start]] on the according instance of the
    * authentication method.
    *
    * @param iTr - inbound transport
    * @param oTr - outbound transport
    * @throws LoginException if:
    *         <ul>
-   *            <li>a default authentication method not specified in the configuration;</li>
    *            <li>any mandatory attributes is not specified in the inbound transport;</li>
-   *            <li>the specified authentication method to start is not configured.</li>
+   *            <li>no authentication method to start processing of an incoming request..</li>
    *         </ul>
    */
   final def start(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    if (iTr.getLoginCtx.isEmpty) {
-      logger.trace("Starting a new login flow")
-      val callbackUri = iTr.getAttribute(CALLBACK_URI_NAME).getOrElse({
-        logger.error("Parameter {} not found in the inbound transport", CALLBACK_URI_NAME)
-        throw new LoginException(s"Parameter $CALLBACK_URI_NAME not found in the inbound transport")
-      }).asInstanceOf[String]
-      iTr.updatedLoginCtx(LoginContext(callbackUri))
+    if(logger.isTraceEnabled) {
+      logger.trace("Starting a new login flow with incoming parameters callback_uri = {}, authn_method = {}",
+        iTr.getAttribute(CALLBACK_URI_NAME), iTr.getAttribute(AUTHN_METHOD_NAME))
     }
 
-    val method = iTr.getAttribute(AUTHN_METHOD_NAME).orElse(defaultAuthnMethod).getOrElse({
-      logger.error("A default login method not specified in the configuration. To fix this fix add a parameter " +
-        "'default = true' to an one authentication method")
-      throw new LoginException("A default login method not specified in the configuration. To fix this fix add a" +
-        " parameter 'default = true' to an one authentication method")
-    }).asInstanceOf[String]
+    iTr.updatedLoginCtx(iTr.getAttribute(CALLBACK_URI_NAME).map(lcBuilder withCallbackUri _ build).fold[LoginContext]{
+      logger.error("Parameter {} not found in the inbound transport", CALLBACK_URI_NAME)
+      throw new LoginException(s"Parameter $CALLBACK_URI_NAME not found in the inbound transport")
+    }(lc => lc))
 
-    logger.debug("Starting a new authentication method: {}", method)
-    methods.get(method).map(_._1.start).orElse({
-      logger.error("The specified authentication method [{}] is not configured. Configured methods: {}",
-        method, methods.keySet)
-      throw new LoginException(s"the specified authentication method [$method] is not configured. Configured " +
-        s"methods: ${methods.keySet}")
-    })
+    iTr.getAttribute(AUTHN_METHOD_NAME).orElse(defaultAuthnMethod).flatMap(methods.get).orElse{
+      logger.error("Found no authentication methods to start processing an incoming request")
+      throw new LoginException("Found no authentication methods to start processing an incoming request")}
+      .map(_._1.start)
   }
 
   /**
-   * Successfully completed the current authentication method and call the method [[nextForSuccess]] to define the next
+   * Successfully completes the current authentication method and call the method [[nextForSuccess]] to define the next
    * point of the login flow.
    *
    * @param method - successfully completed authentication method
@@ -65,10 +60,10 @@ abstract class LoginFlow extends Handler {
    * @param oTr - outbound transport
    */
   final def success(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    val lc = iTr.getLoginCtx.get
     logger.trace("An authentication method {} has been completed successfully. Getting a nex point ...", method)
-    lc.asInstanceOf[LoginContextImpl].addCompletedMethod(method)
-    iTr.updatedLoginCtx(lc) //todo: temporary
+    iTr.updatedLoginCtx(iTr.getLoginCtx.fold[LoginContext]{
+      throw new IllegalStateException("Login context not found.")
+    }(_ addMethod method))
     nextForSuccess
   }
 
@@ -82,7 +77,6 @@ abstract class LoginFlow extends Handler {
    * @param oTr - outbound transport
    */
   final def fail(method: String, cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    implicit val lc = iTr.getLoginCtx.get
     logger.trace("An authentication method {} has been completed not successfully. Getting a nex point ...", method)
     nextForFail(cause)
   }
@@ -95,10 +89,10 @@ abstract class LoginFlow extends Handler {
    * @param oTr - outbound transport
    */
   final protected def endWithSuccess(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    logger.debug("The login flow complete successfully redirect to the following callback url: {}",
-      iTr.getLoginCtx.get.callbackUri)
+    val cbUrl = iTr.getLoginCtx.get.callbackUri
+    logger.debug("The login flow complete successfully redirect to the following callback url: {}", cbUrl)
     //todo: add the result of the login flow
-    oTr.redirect(iTr.getLoginCtx.get.callbackUri)
+    oTr.redirect(cbUrl)
   }
 
   /**
@@ -109,10 +103,10 @@ abstract class LoginFlow extends Handler {
    * @param oTr - outbound transport
    */
   final protected def endWithError(cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    logger.debug("The login flow complete with error [{}] redirect to the following callback url: {}",
-      cause, iTr.getLoginCtx.get.callbackUri)
+    val cbUrl = iTr.getLoginCtx.get.callbackUri
+    logger.debug("The login flow complete with error [{}] redirect to the following callback url: {}", cause, cbUrl)
     //todo: add the error to the result
-    oTr.redirect(iTr.getLoginCtx.get.callbackUri)
+    oTr.redirect(cbUrl)
   }
 
   /**

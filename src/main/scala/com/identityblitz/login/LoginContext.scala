@@ -1,100 +1,123 @@
 package com.identityblitz.login
 
 import com.identityblitz.json._
-import scala.collection.mutable
-import com.identityblitz.json.JSuccess
-import com.identityblitz.login.LoggingUtils._
 
-/**
- */
 trait LoginContext {
+  import com.identityblitz.login.LoginContext._
 
   /**
    * Defines a callback uri to redirect when login flow is completed.
    * @return string represented callback uri.
    */
-  def callbackUri: String
-  
+  val callbackUri: String
+
   /**
    * Defines login methods that have been successfully completed.
    * @return array of login methods that have been successfully completed.
    */
-  def completedMethods: Seq[String]
-
-  /**
-   * Defines the parameters associated with the current login process.
-   * @return json parameters.
-   */
-  def params: JObj
-
-  /**
-   * Adds a specified parameter to the current parameters. If the parameter with the same name already exists it is
-   * overwritten.
-   * @param param the tuple with the parameter name and value.
-   * @tparam T type of the parameter value, for example: Int, Boolean, String and others type of the JSON.
-   * @return the current login context.
-   */
-  def withParam[T](param: (String, T))(implicit writer: JWriter[T]): LoginContext
-
-  /**
-   * Add a specified parameters to the current parameters. All parameters with the same name will be overwritten.
-   * @param params the json object with additional parameters.
-   * @return the current login context.
-   */
-  def withParams(params: JObj): LoginContext
+  val completedMethods: Seq[String]
 
   /**
    * Retrieve claims about the current subject.
    * @return json with claims
    */
-  def claims: JObj
+  val claims: JObj
 
   /**
-   * Add a specified claim to the current claims. If the claim with the same name already exists it is
-   * overwritten.
-   * @param claim the tuple with the claim name and value.
-   * @tparam T type of the claim value, for example: Int, Boolean, String and others type of the JSON.
-   * @return the current login context.
+   * Adds a new completed method to the already added ones.
+   * @param method - method name.
+   * @return - updated login context
    */
-  def withClaim[T](claim: (String, T))(implicit writer: JWriter[T]): LoginContext
+  def addMethod(method :String): LoginContext = lcBuilder(this) withMethod(method) build
 
   /**
-   * Add a specified claims to the current claims. All claims with the same name will be overwritten.
-   * @param claims the json object with additional claims.
-   * @return the current login context.
+   * Adds or replace, if claim already exists, new claim.
+   * @param claim - new claim.
+   * @param writer - writer to convert claim value to JSON value.
+   * @tparam T - claim value type
+   * @return - update login context
    */
-  def withClaims(claims: JObj): LoginContext
+  def addClaim[T](claim: (String, T))(implicit writer: JWriter[T]): LoginContext = lcBuilder(this) withClaim(claim) build
 
   /**
-   * Returns a string representation of this [[com.identityblitz.login.LoginContext]].
-   * @return - string representation of this [[com.identityblitz.login.LoginContext]].
+   * Adds or replace, if claims already exists. new claims.
+   * @param _claims - new claims.
+   * @return - update login context.
    */
-  def asString: String
+  def addClaims(_claims: JObj): LoginContext = lcBuilder(this) withClaims(_claims) build
+
+  def asString: String = Json.toJson(this).toJson
 
 }
 
 object LoginContext {
+  implicit val implicits = scala.language.implicitConversions
+  implicit val refCalls = scala.language.reflectiveCalls
+  implicit val postOps =  scala.language.postfixOps
+
+  implicit def jwriter: JWriter[LoginContext] = new JWriter[LoginContext] {
+    def write(o: LoginContext): JVal = Json.obj(
+      "callbackUri" -> JStr(o.callbackUri),
+      "completedMethods" -> JArr(o.completedMethods.map(JStr(_)).toArray),
+      "claims" -> o.claims
+    )
+  }
+
+  implicit def jreader: JReader[LoginContext] = new JReader[LoginContext] {
+    def read(v: JVal): JResult[LoginContext] = {
+      Right[String, LoginContextBuilder[_]](lcBuilder).right
+        .flatMap(lcb => (v \ "callbackUri").asOpt[String]
+        .fold[Either[String, LoginContextBuilder[READY]]](Left("callbackUri.notFound"))(cb => Right(lcb withCallbackUri cb)))}
+      .right.map(lcb => (v \ "completedMethods").asOpt[Array[String]]
+      .fold[LoginContextBuilder[READY]](lcb)(m => m.foldLeft(lcb)(_ withMethod _)))
+      .right.map(lcb => (v \ "claims").asOpt[JVal].fold[LoginContextBuilder[READY]](lcb)(clm => lcb withClaims clm.asInstanceOf[JObj]))
+      .right.map(lcb => lcb build) match {
+      case Left(err) => JError(err)
+      case Right(lc) => JSuccess(lc)
+    }
+  }
 
   /**
-   * Creates a new implementation of the [[LoginContext]] in accordance with the parameters.
+   * Creates a new implementation of the [[com.identityblitz.login.LoginContext]]] from string representation.
    *
-   * @param callbackUri - string representing the callback uri.
-   * @return login context
-   */
-  def apply(callbackUri: String): LoginContext = new LoginContextImpl(callbackUri)
-
-  /**
-   * Creates a new implementation of the [[LoginContext]]] from string representation.
-   *
-   * @param str - string representation of [[LoginContext]]].
+   * @param str - string representation of [[com.identityblitz.login.LoginContext]]].
    * @return login context.
    */
-  def fromString(str: String) :LoginContext = LoginContextImpl.fromString(str)
+  def fromString(str: String) :LoginContext = Json.fromJson[LoginContext](JVal.parseStr(str))
+
+  /**
+   * Login context builder
+   */
+  abstract class READY
+  abstract class NOT_READY
+
+  class LoginContextBuilder[R](val callbackUri: String, val completedMethods: Seq[String], val claims: JObj) {
+
+    def withCallbackUri(cb: String) = new LoginContextBuilder[READY](cb, completedMethods, claims)
+
+    def withMethod(method: String) = new LoginContextBuilder[R](callbackUri, completedMethods :+ method, claims)
+
+    def withClaim[T](claim: (String, T))(implicit writer: JWriter[T]) =
+      new LoginContextBuilder[R](callbackUri, completedMethods, claims +! claim)
+
+    def withClaims(_claims: JObj) = new LoginContextBuilder[R](callbackUri, completedMethods, claims ++! _claims)
+
+  }
+
+  implicit def enableBuild(builder: LoginContextBuilder[READY]) = new {
+    def build() = new LoginContextImpl(builder.callbackUri, builder.completedMethods, builder.claims)
+  }
+
+  def lcBuilder = new LoginContextBuilder[NOT_READY](null, Seq(), JObj())
+
+  def lcBuilder(lc: LoginContext) = new LoginContextBuilder[READY](lc.callbackUri, lc.completedMethods, lc.claims)
 
 }
 
+case class LoginContextImpl(callbackUri: String, completedMethods: Seq[String], claims: JObj) extends LoginContext
 
-private[login] class LoginContextImpl extends LoginContext {
+
+/*private[login] class LoginContextImpl extends LoginContext {
 
   private var _callbackUri: String = _
   private val _completedMethods = new mutable.ArrayBuffer[String]()
@@ -201,4 +224,42 @@ private[login] object LoginContextImpl {
 
   def fromString(str: String) :LoginContextImpl = Json.fromJson[LoginContextImpl](JVal.parseStr(str))
 
-}
+}*/
+
+/*/**
+ * Adds a specified parameter to the current parameters. If the parameter with the same name already exists it is
+ * overwritten.
+ * @param param the tuple with the parameter name and value.
+ * @tparam T type of the parameter value, for example: Int, Boolean, String and others type of the JSON.
+ * @return the current login context.
+ */
+def withParam[T](param: (String, T))(implicit writer: JWriter[T]): LoginContext
+
+/**
+ * Add a specified parameters to the current parameters. All parameters with the same name will be overwritten.
+ * @param params the json object with additional parameters.
+ * @return the current login context.
+ */
+def withParams(params: JObj): LoginContext
+
+/**
+* Add a specified claim to the current claims. If the claim with the same name already exists it is
+* overwritten.
+* @param claim the tuple with the claim name and value.
+* @tparam T type of the claim value, for example: Int, Boolean, String and others type of the JSON.
+* @return the current login context.
+*/
+def withClaim[T](claim: (String, T))(implicit writer: JWriter[T]): LoginContext
+
+/**
+* Add a specified claims to the current claims. All claims with the same name will be overwritten.
+* @param claims the json object with additional claims.
+* @return the current login context.
+*/
+def withClaims(claims: JObj): LoginContext
+
+/**
+* Returns a string representation of this [[com.identityblitz.login.LoginContext]].
+* @return - string representation of this [[com.identityblitz.login.LoginContext]].
+*/
+def asString: String*/

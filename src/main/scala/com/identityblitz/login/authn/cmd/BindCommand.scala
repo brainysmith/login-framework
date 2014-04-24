@@ -3,11 +3,12 @@ package com.identityblitz.login.authn.cmd
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json._
 import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.Conf
+import com.identityblitz.login.{LoginContext, Conf}
 import com.identityblitz.login.error.{CustomLoginError, LoginError, CommandException}
+import com.identityblitz.login.authn.provider.{WithBind, Provider}
 
 /**
- */
+  */
 
 sealed abstract class BindCommand(val methodName: String, val params: Seq[String],
                                   val attempts: Int = 0) extends Command {
@@ -25,7 +26,11 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
     err
   })
 
-  lazy val bindProviders = Conf.methods(methodName)._2.bindProviders
+  lazy val bindProviders = Conf.methods(methodName)._2.bindProviders.ensuring(!_.isEmpty, {
+    val err = s"No bind provider found [authentication method = $methodName]. Check the configuration."
+    logger.error(err)
+    throw new IllegalStateException(err)
+  })
 
   override val name: String = COMMAND_NAME
 
@@ -39,32 +44,33 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
     }
   }
 
-  override def execute(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Option[Command]] = {
+  override def execute(implicit itr: InboundTransport, otr: OutboundTransport): Either[CommandException, Option[Command]] = {
     logger.trace("executing bind command against following bind providers: {}", bindProviders)
-    val data = params.map(name => name -> iTr.getParameter(name).getOrElse(null)).toMap
-    val bindRes = bindProviders.ensuring(!_.isEmpty, {
-        val err = s"No bind provider found [authentication method = $methodName]. Check the configuration."
-        logger.error(err)
-        throw new IllegalStateException(err)}
-    ).foldLeft[Either[LoginError, (Option[JObj], Option[Command])]]{Left(CustomLoginError("no_provider_found"))}{
-      case (ok @ Right(_), bp) =>
-        logger.trace("Skip the '{}' binding provider because the binding has already completed successfully", bp.name)
-        ok
-      case (Left(err), bp) =>
-        logger.trace("Attempting to bind with '{}' bind provider", bp.name)
-        val iRes = bp.bind(data)
-        logger.trace("Result of attempting to bind with '{}' bind provider: {}", bp.name, iRes)
-        iRes
+
+    val data = (for {
+      name <- params
+      value <- itr.getParameter(name)
+    } yield (name, value)).toMap
+
+    def doBind(providers: Array[Provider with WithBind],
+               data: Map[String, String]) :Either[Seq[(String, LoginError)], (Option[JObj], Option[Command])] = {
+      providers.foldLeft[Either[Seq[(String, LoginError)], (Option[JObj], Option[Command])]]{
+        Left(Seq(("", CustomLoginError("no_provider_found"))))}{
+        case (ok @ Right(_), bp) => return ok
+        case (Left(errs), bp) => bp.bind(data).left.map(e => errs :+ (bp.name, e))
+      }
     }
 
-    logger.debug("The final result of the binding command: {}", bindRes)
-    bindRes match {
-      case Right((claimsWrapped, command)) =>
-        claimsWrapped.map(claims => iTr.updatedLoginCtx(iTr.getLoginCtx.get.withClaims(claims)))
-        Right(command)
-      case Left(errKey) =>
-        Left(new CommandException(this, errKey))
-    }
+    doBind(bindProviders, data).right.map( t => {
+      itr.updatedLoginCtx(itr.getLoginCtx.fold[LoginContext]{
+        throw new IllegalStateException("Login context not found.")}(_ addClaims t._1.get))
+      t._2
+    }).left.map(e => {
+      if(logger.isDebugEnabled)
+        logger.debug(e map(l => l._1 + " -> " + l._2) mkString("Errors while binding: ", ",","."))
+      new CommandException(this, e.last._2)
+  })
+
   }
 
   override def toString: String = new StringBuilder(this.getClass.getSimpleName)
@@ -91,11 +97,11 @@ object BindCommand {
 
   private[cmd] def apply(state: JVal) = Right[String, (String, Seq[String], Int)](Tuple3(null, Seq(), 0))
     .right.flatMap(acm => (state \ "method").asOpt[String].fold[Either[String, (String, Seq[String], Int)]]{
-      Left(s"Deserialization of the bind command`s state [${state.toJson}] failed: method is not specified")
-      }{Right(_, acm._2, acm._3)})
+    Left(s"Deserialization of the bind command`s state [${state.toJson}] failed: method is not specified")
+  }{Right(_, acm._2, acm._3)})
     .right.flatMap(acm => (state \ "params").asOpt[Array[String]].fold[Either[String, (String, Seq[String], Int)]]{
-      Left(s"Deserialization of the bind command`s state [${state.toJson}] failed: params is not specified")
-      }{Right(acm._1, _, acm._3)})
+    Left(s"Deserialization of the bind command`s state [${state.toJson}] failed: params is not specified")
+  }{Right(acm._1, _, acm._3)})
     .right.flatMap(acm => (state \ "attempts").asOpt[Int].fold[Either[String, (String, Seq[String], Int)]]{
     Right(acm._1, acm._2, 0)}{Right(acm._1, acm._2, _)}) match {
     case Left(err) =>
