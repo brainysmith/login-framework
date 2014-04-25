@@ -83,23 +83,7 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
                     logger.trace("The user's password has expired [userDn = {}, ldap = {}]", userDn, name)
                     Right[LoginError, (JObj, Option[Command])](JObj() -> Some(new ChangePswdCmd(name, userDn)))
                   case None =>
-                    logger.trace("Try to get user's attributes [userDn = {}, ldap = {}]", userDn, name)
-                    val claims = Option(connection.getEntry(userDn)).fold[JObj]({
-                      val err = s"Can't get the subject's entry: check the '$name' LDAP access rules. The subject " +
-                        s"must have an access to his entry [userDn = $userDn]."
-                      logger.error(err)
-                      throw new IllegalAccessException(err)
-                    })(entry => {
-                      val attrs = for {
-                        meta <- attrsMeta 
-                        attr <- Option(entry.getAttribute(meta.name))
-                        attrValue <- Option(new LdapAttrValue(attr, meta.valType))
-                      } yield meta.name -> attrValue.asJVal
-
-                      JObj(attrs)
-                    })
-                    logger.trace("Got following claims [userDn = {}, ldap = {}]: {}",
-                      Array[AnyRef](userDn, name, claims.toJson))
+                    val claims = getUserAttributes(userDn)
                     Right[LoginError, (JObj, Option[Command])](claims -> None)
                 }
               case Left(err) => Left(err)
@@ -135,8 +119,9 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
             case Success(res) =>
               if (res.getResultCode == ResultCode.SUCCESS) {
                 logger.debug("Change password is successful")
+                val claims = getUserAttributes(userDn)
                 /*todo: thinking about adding a command for getting attributes or make other decision*/
-                Right(None, None)
+                Right(claims, None)
               } else {
                 logger.debug("Change password failed [userDn = {}]. Ldap result code: {}", userDn, res)
                 Left(mapLdapError(res.getResultCode))
@@ -194,6 +179,25 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
         logger.error("Can't perform bind to '{}' LDAP. Internal error has occurred: {}", name, e.getMessage)
         throw e
     }
+  }
+  
+  protected def getUserAttributes(userDn: String)(implicit connection: LDAPConnection): JObj = {
+    logger.trace("Getting user's attributes [userDn = {}, ldap = {}]", userDn, name)
+    Option(connection.getEntry(userDn)).fold[JObj]({
+      val err = s"Can't get the subject's entry: check the '$name' LDAP access rules. The subject " +
+        s"must have an access to his entry [userDn = $userDn]."
+      logger.error(err)
+      throw new IllegalAccessException(err)
+    })(entry => {
+      val attrs = for {
+        meta <- attrsMeta
+        attr <- Option(entry.getAttribute(meta.name))
+        attrValue <- Option(new LdapAttrValue(attr, meta.valType))
+      } yield meta.name -> attrValue.asJVal
+
+      logger.trace("Got following claims [userDn = {}, ldap = {}]: {}", Array[AnyRef](userDn, name, attrs))
+      JObj(attrs)
+    })    
   }
 
   protected def mapLdapError(code: ResultCode) = errorMapper.get(code).getOrElse({

@@ -8,6 +8,6 @@ import com.identityblitz.json.JObj
   */
 trait WithChangePswd {
 
-  def changePswd(userId: String, curPswd: String, newPswd: String): Either[LoginError, (Option[JObj], Option[Command])]
+  def changePswd(userId: String, curPswd: String, newPswd: String): Either[LoginError, (JObj, Option[Command])]
 
 }
