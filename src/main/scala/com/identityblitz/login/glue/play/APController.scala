@@ -4,7 +4,7 @@ import play.api.mvc._
 import scala.concurrent.{Promise, Future}
 import play.api.libs.iteratee.Done
 import com.identityblitz.scs.glue.play.{SCSEnabledAction, SCSRequest}
-import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
+import com.identityblitz.login.transport.{AjaxRedirectResponse, OutboundTransport, InboundTransport}
 import com.identityblitz.login.error.TransportException
 import play.api.Play
 import com.identityblitz.login._
@@ -51,6 +51,7 @@ import scala.util.{Failure, Success, Try}
  * </table>
  */
 object APController extends Controller {
+  implicit val reflective = scala.language.reflectiveCalls
 
   val loginPath = "/login/"
 
@@ -64,10 +65,10 @@ object APController extends Controller {
    * @param handler - name of handler to process incoming request on.
    * @return - response.
    */
-  def doGet(handler: String) = SCSEnabledAction.async{
+  def doGet(handler: String) = SCSEnabledAction.async {
     implicit request => {
-      implicit val otr = PlayOutboundTransport.apply
-      implicit val itr = PlayInboundTransport(otr)
+      implicit val itr = PlayInboundTransport.apply
+      implicit val otr = itr.outboundTransport
 
       itr.setAttribute(FlowAttrName.HTTP_METHOD, "GET")
       invokeHandler(handler, ifDirectCall(request)) match {
@@ -89,8 +90,8 @@ object APController extends Controller {
   def doPost(handler: String) = SCSEnabledAction.async(parse.urlFormEncoded) {
     implicit request => {
       implicit val postParams = request.body
-      implicit val otr = PlayOutboundTransport.apply
-      implicit val itr = PlayInboundTransport(otr)
+      implicit val itr = PlayInboundTransport.apply
+      implicit val otr = itr.outboundTransport
 
       itr.setAttribute(FlowAttrName.HTTP_METHOD, "POST")
       invokeHandler(handler, ifDirectCall(request)) match {
@@ -165,9 +166,12 @@ object Forwardable extends ActionBuilder[Request] {
  * @param req
  * @tparam A
  */
-private class PlayInboundTransport[A](private val otr: PlayOutboundTransport,
-                                      private val req: SCSRequest[A],
+private class PlayInboundTransport[A](private val req: SCSRequest[A],
                                       private val formParams: Map[String, Seq[String]]) extends InboundTransport {
+  self =>
+
+  val outboundTransport = makeOutboundTransport
+
   @volatile private var forwarded = false
   private val attributes = scala.collection.concurrent.TrieMap[String, String]()
   private val params = req.queryString.mapValues(seq => seq(0)) ++ formParams.mapValues(seq => seq(0))
@@ -178,18 +182,18 @@ private class PlayInboundTransport[A](private val otr: PlayOutboundTransport,
 
   @throws(classOf[TransportException])
   def forward(path: String): Unit = {
+    implicit val reflective = scala.language.reflectiveCalls
     forwarded = true
-    otr.resultPromise.completeWith {
+    outboundTransport.resultPromise.completeWith {
       Play.application.routes.get.routes.apply(DispatchRequestHeader(path)) match {
-        case a: EssentialAction => {
+        case a: EssentialAction =>
           a.apply(Request(req.copy(tags = req.tags ++ attributes + ("FORWARDED" -> "true")), req.body)).run
-        }
         case e: Throwable => throw new TransportException(e)
       }
     }
   }
 
-  val isAjax = "XMLHttpRequest" == req.headers.get("X-Requested-With").getOrElse(null)
+  val isAjax = "XMLHttpRequest" == req.headers.get("X-Requested-With").getOrElse("")
 
   def unwrap: AnyRef = req
 
@@ -203,8 +207,46 @@ private class PlayInboundTransport[A](private val otr: PlayOutboundTransport,
 
   def setAttribute(name: String, value: String): Unit = {attributes(name) = value}
 
-  private[play] def isForwarded = forwarded
+  private def isForwarded = forwarded
 
+  private def makeOutboundTransport = new OutboundTransport {
+    val resultPromise = Promise[SimpleResult]
+    private val futureResult = resultPromise.future
+
+    /**
+     * Redirect the user agent to the specified location.
+     * @param location - location to redirect to.
+     * @throws TransportException - if any error occurred while redirecting.
+     */
+    def redirect(location: String): Unit = if(self.isAjax) {
+      import com.identityblitz.login.glue.play.JUtil._
+      resultPromise.success(Ok(new AjaxRedirectResponse(location).jObj))
+    }
+    else {
+      resultPromise.success(Redirect(location))
+    }
+
+    /**
+     * Returns unwrapped transport.
+     * @return - unwrapped transport.
+     */
+    def unwrap: AnyRef = {
+      throw new UnsupportedOperationException("OutboundTransport for Play application does not supported unwrap operation.")
+    }
+
+    /**
+     * Return the platform of the transport.
+     * @return
+     */
+    def platform: Platform.Platform = self.platform
+
+    def result: Future[SimpleResult] = {
+      if(!self.isForwarded && !resultPromise.isCompleted)
+        resultPromise.success(NotFound)
+      futureResult
+    }
+
+  }
 
   /**
    * To dispatch
@@ -234,13 +276,12 @@ private class PlayInboundTransport[A](private val otr: PlayOutboundTransport,
 
 private object PlayInboundTransport {
 
-  def apply[A](otr: PlayOutboundTransport)
-              (implicit req: SCSRequest[A], params: Map[String, Seq[String]] = Map.empty): PlayInboundTransport[A] =
-    new PlayInboundTransport[A](otr, req, params)
+  def apply[A](implicit req: SCSRequest[A], params: Map[String, Seq[String]] = Map.empty): PlayInboundTransport[A] =
+    new PlayInboundTransport[A](req, params)
 
 }
 
-/**
+/*/**
  * Play outbound transport implementation
  */
 private class PlayOutboundTransport extends OutboundTransport {
@@ -248,7 +289,15 @@ private class PlayOutboundTransport extends OutboundTransport {
   private val futureResult = resultPromise.future
 
   @throws(classOf[TransportException])
-  def redirect(location: String): Unit = {resultPromise.success(Redirect(location))}
+  def redirect[A](location: String)(implicit itr: InboundTransport): Unit = {
+    if("XMLHttpRequest" == itr.unwrap.asInstanceOf[RequestHeader].headers("X-Requested-With")) {
+      import com.identityblitz.login.glue.play.JUtil._
+      resultPromise.success(Ok(new AjaxRedirectResponse(location).jObj))
+    }
+    else {
+      resultPromise.success(Redirect(location))
+    }
+  }
 
   def unwrap: AnyRef = {
     throw new UnsupportedOperationException("OutboundTransport for Play application does not supported unwrap operation.")
@@ -261,11 +310,4 @@ private class PlayOutboundTransport extends OutboundTransport {
       resultPromise.success(NotFound)
     futureResult
   }
-}
-
-
-private object PlayOutboundTransport {
-
-  def apply: PlayOutboundTransport = new PlayOutboundTransport
-
-}
+}*/
