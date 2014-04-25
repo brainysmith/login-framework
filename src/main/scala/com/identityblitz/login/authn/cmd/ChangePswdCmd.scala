@@ -37,11 +37,12 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
 
 
   override def execute(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    logger.trace("executing change password command against following bind provider: {}", providerName)
+    logger.trace("Executing change password command against following bind provider: {}", providerName)
     (iTr.getParameter("currentPassword"), iTr.getParameter("newPassword")) match {
       case (Some(curPswd), Some(newPswd)) =>
-        provider.changePswd(userId, curPswd, newPswd).left.map(CommandException(this, _)).right.map{
-          case (claimsWrapped, cmd) =>
+        provider.changePswd(userId, curPswd, newPswd)
+          .left.map(CommandException(this, _))
+          .right.map{ case (claimsWrapped, cmd) =>
             claimsWrapped.map(claims => iTr.updatedLoginCtx(iTr.getLoginCtx.get.addClaims(claims)))
             cmd
         }

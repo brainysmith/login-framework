@@ -18,23 +18,11 @@ object Conf {
       name -> (meta.newInstance -> meta)
   }
 
-  def resolveProvider(name: String) = providers.get(name).getOrElse({
-    val err = s"Provider with name $name is not found"
-    logger.error(err)
-    throw new IllegalArgumentException(err)
-  })._1
-
-  val methods = confService.getPropsDeepGrouped("authnMethods")
-    .map({case (name, options) => AuthnMethodMeta(name, options, resolveProvider)})
-    .foldLeft[collection.mutable.Map[String, (AuthnMethod, AuthnMethodMeta)]](collection.mutable.Map())(
-      (acm, meta) => {
-        val value = meta.newInstance -> meta
-        if (meta.isDefault) {
-          acm += ("default" -> value)
-        }
-        acm += (meta.name -> value)
-      }
-    ).toMap
+  val methods = confService.getPropsDeepGrouped("authnMethods").map{
+    case (name, options) =>
+      val meta = AuthnMethodMeta(name, options, resolveProvider)
+      name -> (meta.newInstance -> meta)
+  }
 
   val loginFlow = confService.getOptString("loginFlow").fold[LoginFlow]({
     logger.debug("Will use the built-in login flow: {}", BuiltInLoginFlow.getClass.getSimpleName)
@@ -43,6 +31,12 @@ object Conf {
     logger.debug("Find in the configuration a custom login flow [class = {}]", className)
     Reflection.getConstructor(className).apply().asInstanceOf[LoginFlow]
   })
+
+  def resolveProvider(name: String) = providers.get(name).getOrElse({
+    val err = s"Provider with name $name is not found"
+    logger.error(err)
+    throw new IllegalArgumentException(err)
+  })._1
 
   def resolveMethod(name: String) = methods.get(name).getOrElse({
     val err = s"Authentication method with name $name is not found"
@@ -55,18 +49,18 @@ case class ProviderMeta(name: String, options: Map[String, String]) extends Inst
 
   private object Options extends Enumeration {
     import scala.language.implicitConversions
-
     type Options = Value
-    val `class` = Value
+
+    val CLASS = Value("class")
 
     implicit def valueToString(v: Value): String = v.toString
 
-    val builtInOptions = values.map(_.toString)
+    val optionNames = values.map(_.toString)
   }
 
   import Options._
 
-  override val initArgs = Array[Any](name, options.filter(entry => !builtInOptions.contains(entry._1)))
+  override val initArgs = Array[Any](name, options.filter(entry => !optionNames.contains(entry._1)))
 
   override def toString: String = {
     val sb =new StringBuilder("BindProviderMeta(")
@@ -81,32 +75,36 @@ case class AuthnMethodMeta(name: String, options: Map[String, String],
 
   private object Options extends Enumeration {
     import scala.language.implicitConversions
-
     type Options = Value
-    val `class`, default, `bind-providers`, `attributes-providers` = Value
+
+    val CLASS = Value("class")
+    val DEFAULT = Value("default")
+    val BIND_PROVIDERS = Value("bind-providers")
+    val ATTRIBUTES_PROVIDER = Value("attributes-providers")
+
 
     implicit def valueToString(v: Value): String = v.toString
 
-    val builtInOptions = values.map(_.toString)
+    val optionNames = values.map(_.toString)
   }
 
   import Options._
   
-  val isDefault = options.get(default).fold(false)(_.toBoolean)
-  /*todo: restore*/
-  val bindProviders = options.get("bind-providers").map(_.split(",")).getOrElse[Array[String]]({
+  val isDefault = options.get(DEFAULT).fold(false)(_.toBoolean)
+
+  val bindProviders = options.get(BIND_PROVIDERS).map(_.split(",")).getOrElse[Array[String]]({
     logger.warn(s"Configuration warning: 'bind-providers' is not specified for '$name' authentication method.")
     Array()})
     .map(pName => resolveProvider(pName))
     .filter(bp => {classOf[WithBind].isAssignableFrom(bp.getClass)})
     .map(_.asInstanceOf[Provider with WithBind])
 
-  val attributesProviders = options.get(`attributes-providers`).map(_.split(",")).getOrElse[Array[String]](Array())
+  val attributesProviders = options.get(ATTRIBUTES_PROVIDER).map(_.split(",")).getOrElse[Array[String]](Array())
     .map(pName => resolveProvider(pName))
     .filter(bp => {classOf[WithAttributes].isAssignableFrom(bp.getClass)})
     .map(_.asInstanceOf[Provider with WithAttributes])
 
-  override val initArgs = Array[Any](name, options.filter(entry => !builtInOptions.contains(entry._1)))
+  override val initArgs = Array[Any](name, options.filter(entry => !optionNames.contains(entry._1)))
 
   override def toString: String = {
     val sb =new StringBuilder("AuthnMethodMeta(")

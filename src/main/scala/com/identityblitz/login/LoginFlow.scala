@@ -15,7 +15,7 @@ import com.identityblitz.login.LoginContext._
 @implicitNotFound("No implicit inbound or outbound found.")
 abstract class LoginFlow extends Handler {
 
-  private val defaultAuthnMethod = methods.get("default").map(_._2.name).orElse{
+  private val defaultAuthnMethod = methods.find(_._2._2.isDefault).map(_._1).orElse{
     logger.warn("A default login method not specified in the configuration. To fix this fix add a parameter " +
       "'default = true' to an one authentication method")
     None
@@ -129,12 +129,6 @@ abstract class LoginFlow extends Handler {
    * @param oTr - outbound transport
    */
   protected def nextForFail(cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport)
-}
-
-object LoginFlow {
-
-  /*def apply() = Conf.loginFlow*/
-
 }
 
 private[login] object BuiltInLoginFlow extends LoginFlow {

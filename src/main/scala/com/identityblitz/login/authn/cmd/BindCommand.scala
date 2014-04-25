@@ -45,7 +45,7 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
   }
 
   override def execute(implicit itr: InboundTransport, otr: OutboundTransport): Either[CommandException, Option[Command]] = {
-    logger.trace("executing bind command against following bind providers: {}", bindProviders)
+    logger.trace("Executing bind command against following bind providers: {}", bindProviders)
 
     val data = (for {
       name <- params

@@ -25,6 +25,8 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
 
   logger.trace("initializing the '{}' LDAP bind provider [options={}]", name, options)
 
+  /*options.filter(_._1.startsWith("attributes2"))*/
+
   private val confMap = paramsMeta.foldLeft[(List[String], collection.mutable.Map[String, Any])]((List(), collection.mutable.Map()))(
     (res, f) => f(options) match {
       case Left(err) => (err :: res._1) -> res._2
@@ -57,6 +59,8 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
     val maxConnections = confMap("maxConnections").asInstanceOf[Int]
     new LDAPConnectionPool(connection, initialConnections, maxConnections)
   }
+  
+  private val attrsMeta = confMap("attributes").asInstanceOf[Seq[AttrMeta]]
 
   /** bossiness functions **/
 
@@ -86,11 +90,16 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
                       logger.error(err)
                       throw new IllegalAccessException(err)
                     })(entry => {
-                      /*todo: getting the real attributes (correlate with change password operation)*/
-                      JObj("attribute1" -> JStr("value1"))
+                      val attrs = for {
+                        meta <- attrsMeta 
+                        attr <- Option(entry.getAttribute(meta.name))
+                        attrValue <- Option(new LdapAttrValue(attr, meta.valType))
+                      } yield meta.name -> attrValue.asJVal
+
+                      JObj(attrs)
                     })
                     logger.trace("Got following claims [userDn = {}, ldap = {}]: {}",
-                      Array(userDn, name, claims.toJson))
+                      Array[AnyRef](userDn, name, claims.toJson))
                     Right[LoginError, (JObj, Option[Command])](claims -> None)
                 }
               case Left(err) => Left(err)
@@ -203,8 +212,6 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
 }
 
 
-
-
 private object LdapBindProvider {
 
   private def rOrL(prms: Map[String, String])(prm: String, default: => Either[String, Any], convert: String => Any) =
@@ -221,7 +228,8 @@ private object LdapBindProvider {
     rOrL(_)("autoReconnect", Right(true), str => str.toBoolean),
     rOrL(_)("useSSL", Right(true), str => str.toBoolean),
     rOrL(_)("initialConnections", Right(1), str => str.toInt),
-    rOrL(_)("maxConnections", Right(5), str => str.toInt)  
+    rOrL(_)("maxConnections", Right(5), str => str.toInt),
+    rOrL(_)("attributes", Right(List.empty), str => AttrMeta.parseArray(str))
   )
 
   val errorMapper = Map(ResultCode.INVALID_CREDENTIALS -> INVALID_CREDENTIALS,
@@ -231,29 +239,29 @@ private object LdapBindProvider {
 }
 
 
-trait AttrMeta {
-  if (baseName == null || valType == null) throw new NullPointerException("baseName and valType can't ba null")
+private trait AttrMeta {
+  if (name == null || valType == null) throw new NullPointerException("name and valType can't ba null")
 
-  def baseName: String
+  def name: String
 
   def valType: AttrType
 
   override def toString: String = {
     val sb =new StringBuilder("AttrMeta(")
-    sb.append("baseName -> ").append(baseName)
+    sb.append("name -> ").append(name)
     sb.append(", ").append("valType -> ").append(valType)
     sb.append(")").toString()
   }
 }
 
-case class AttrMetaImpl(baseName: String, valType: AttrType) extends AttrMeta {}
+private case class AttrMetaImpl(name: String, valType: AttrType) extends AttrMeta {}
 
-object AttrMeta {
+private object AttrMeta {
 
   def apply(v: JObj): AttrMeta = {
     Right[String, Seq[Any]](Seq()).right.map(seq => {
-      (v \ "baseName").asOpt[String].fold[Either[String, Seq[Any]]](Left("baseName.notFound"))(baseName => {
-        Right(seq :+ baseName)
+      (v \ "name").asOpt[String].fold[Either[String, Seq[Any]]](Left("name.notFound"))(name => {
+        Right(seq :+ name)
       })
     }).joinRight.right.map(seq => {
       (v \ "valType").asOpt[String].fold[Either[String, Seq[Any]]](Left("valType.notFound"))(valTypeStr => {
@@ -263,15 +271,13 @@ object AttrMeta {
         })
       })
     }).joinRight match {
-      case Left(err) => {
+      case Left(err) =>
         logger.error("can't parse attrMeta [error = {}, json = {}]", Seq(err, v.toJson))
         throw new IllegalArgumentException("can't parse attrMeta")
-      }
-      case Right(seq) => {
+      case Right(seq) =>
         val attrMeta = new AttrMetaImpl(seq(0).asInstanceOf[String], seq(1).asInstanceOf[AttrType])
         logger.error("the attrMeta has been parsed successfully [attrMeta = {}]", attrMeta)
         attrMeta
-      }
     }
   }
 
@@ -285,7 +291,28 @@ object AttrMeta {
 /**
  * Enumeration of attribute types.
  */
-object AttrType extends Enumeration {
+private object AttrType extends Enumeration {
   type AttrType = Value
   val string, strings, boolean, number, bytes = Value
 }
+
+private class LdapAttrValue(attr: Attribute, valType: AttrType) {
+  import LdapAttrValue.valueMap
+
+  def asJVal = valueMap(valType).apply(attr)
+}
+
+private object LdapAttrValue {
+  import com.identityblitz.login.util.Base64Util._
+  import AttrType._
+
+  private val valueMap = Map(
+    string -> ((attr: Attribute) => JStr(attr.getValue)),
+    strings -> ((attr: Attribute) => JArr(attr.getValues.map(JStr(_).asInstanceOf[JVal]))),
+    boolean -> ((attr: Attribute) => JBool(attr.getValueAsBoolean)),
+    number -> ((attr: Attribute) => Option(attr.getValueAsLong).map(l => JNum(BigDecimal(l))).getOrElse(JNull)) ,
+    bytes -> ((attr: Attribute) => JStr(encode(attr.getValueByteArray)))
+  )
+}
+
+

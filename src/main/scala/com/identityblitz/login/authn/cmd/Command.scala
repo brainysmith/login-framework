@@ -4,7 +4,7 @@ import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json.{Json, JVal}
 import com.identityblitz.login.LoggingUtils._
 import com.identityblitz.login.error.CommandException
-import org.apache.commons.codec.binary.Base64
+import com.identityblitz.login.util.Base64Util._
 
 /**
   */
@@ -16,8 +16,7 @@ trait Command {
 
   def saveState: JVal
 
-  final def asString(): String =
-    Base64.encodeBase64String(Json.obj("name" -> name, "state" -> saveState).toJson.getBytes("UTF-8"))
+  final def asString(): String = encode(Json.obj("name" -> name, "state" -> saveState).toJson)
 
 }
 
@@ -28,14 +27,14 @@ object Command {
     ChangePswdCmd.COMMAND_NAME -> {(state: JVal) => ChangePswdCmd(state)}
   )
 
-  def apply[T <: Command](cmdStr: String): T = {
-    val jval = JVal.parseStr(new String(Base64.decodeBase64(cmdStr), "UTF-8"))
-    (jval \ "name").asOpt[String].fold[T]({
-      val err = s"Deserialization of the command [$cmdStr] failed: the name attribute is not found"
+  def apply[T <: Command](base64Cmd: String): T = {
+    val jVal = JVal.parseStr(decodeAsString(base64Cmd))
+    (jVal \ "name").asOpt[String].fold[T]({
+      val err = s"Deserialization of the command [$base64Cmd] failed: the name attribute is not found"
       logger.error(err)
       throw new IllegalArgumentException(err)
-    })(name => cmdMap.get(name).map(_(jval \ "state")).getOrElse({
-      val err = s"Deserialization of the command [$cmdStr] failed: unknown command`s name [$name]"
+    })(name => cmdMap.get(name).map(_(jVal \ "state")).getOrElse({
+      val err = s"Deserialization of the command [$base64Cmd] failed: unknown command`s name [$name]"
       logger.error(err)
       throw new IllegalArgumentException(err)
     }).asInstanceOf[T])
