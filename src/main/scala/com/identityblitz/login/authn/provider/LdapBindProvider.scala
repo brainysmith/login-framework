@@ -25,8 +25,6 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
 
   logger.trace("initializing the '{}' LDAP bind provider [options={}]", name, options)
 
-  /*options.filter(_._1.startsWith("attributes2"))*/
-
   private val confMap = paramsMeta.foldLeft[(List[String], collection.mutable.Map[String, Any])]((List(), collection.mutable.Map()))(
     (res, f) => f(options) match {
       case Left(err) => (err :: res._1) -> res._2
@@ -59,8 +57,10 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
     val maxConnections = confMap("maxConnections").asInstanceOf[Int]
     new LDAPConnectionPool(connection, initialConnections, maxConnections)
   }
-  
-  private val attrsMeta = confMap("attributes").asInstanceOf[Seq[AttrMeta]]
+
+  private val attrsMeta = options.filter(_._1.startsWith("attributes"))
+    .map{case (k, v) => k.stripPrefix("attributes.") -> v}
+    .map{AttrMeta(_)}.toSeq
 
   /** bossiness functions **/
 
@@ -120,7 +120,6 @@ class LdapBindProvider(name:String, options: Map[String, String]) extends Provid
               if (res.getResultCode == ResultCode.SUCCESS) {
                 logger.debug("Change password is successful")
                 val claims = getUserAttributes(userDn)
-                /*todo: thinking about adding a command for getting attributes or make other decision*/
                 Right(claims, None)
               } else {
                 logger.debug("Change password failed [userDn = {}]. Ldap result code: {}", userDn, res)
@@ -232,8 +231,7 @@ private object LdapBindProvider {
     rOrL(_)("autoReconnect", Right(true), str => str.toBoolean),
     rOrL(_)("useSSL", Right(true), str => str.toBoolean),
     rOrL(_)("initialConnections", Right(1), str => str.toInt),
-    rOrL(_)("maxConnections", Right(5), str => str.toInt),
-    rOrL(_)("attributes", Right(List.empty), str => AttrMeta.parseArray(str))
+    rOrL(_)("maxConnections", Right(5), str => str.toInt)
   )
 
   val errorMapper = Map(ResultCode.INVALID_CREDENTIALS -> INVALID_CREDENTIALS,
@@ -286,6 +284,8 @@ private object AttrMeta {
   }
 
   def apply(jsonStr: String): AttrMeta = apply(JVal.parseStr(jsonStr).asInstanceOf[JObj])
+
+  def apply(t: (String, String)): AttrMeta = new AttrMetaImpl(t._1, AttrType.withName(t._2))
 
   def parseArray(jsonStr: String): Seq[AttrMeta] = {
     JVal.parseStr(jsonStr).asInstanceOf[JArr].map(jv => apply(jv.asInstanceOf[JObj]))
