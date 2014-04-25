@@ -27,7 +27,7 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
     err    
   })
 
-  lazy val provider = Conf.providers.get(providerName).map(_.asInstanceOf[Provider with WithChangePswd]).getOrElse({
+  lazy val provider = Conf.providers.get(providerName).map(_._1).map(_.asInstanceOf[Provider with WithChangePswd]).getOrElse({
     val err = s"Provider with specified name '$providerName' is not configured."
     logger.error(err)
     throw new IllegalArgumentException(err)
