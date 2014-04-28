@@ -7,6 +7,7 @@ import com.identityblitz.login.error.{LoginError, LoginException}
 import com.identityblitz.login.FlowAttrName._
 import com.identityblitz.login.Conf.methods
 import com.identityblitz.login.LoginContext._
+import java.net.URLEncoder
 
 /**
  * Defines a flow of the login process.
@@ -90,8 +91,8 @@ abstract class LoginFlow extends Handler {
    */
   final protected def endWithSuccess(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     val cbUrl = iTr.getLoginCtx.get.callbackUri
-    logger.debug("The login flow complete successfully redirect to the following callback url: {}", cbUrl)
-    //todo: add the result of the login flow
+    logger.debug("The login flow is completed successfully [lc = {}]. Redirect to the following callback url: {}",
+      iTr.toString, cbUrl)
     oTr.redirect(cbUrl)
   }
 
@@ -103,10 +104,11 @@ abstract class LoginFlow extends Handler {
    * @param oTr - outbound transport
    */
   final protected def endWithError(cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    val cbUrl = iTr.getLoginCtx.get.callbackUri
-    logger.debug("The login flow complete with error [{}] redirect to the following callback url: {}", cause, cbUrl)
-    //todo: add the error to the result
-    oTr.redirect(cbUrl)
+    val callbackUri = iTr.getLoginCtx.get.callbackUri
+    val errorParam = URLEncoder.encode("error=" + cause.name, "UTF-8")
+    val location = callbackUri + (if (callbackUri.contains("?")) "&" else "?") + errorParam
+    logger.debug("The login flow complete with error [{}] redirect to the following location: {}", cause, location)
+    oTr.redirect(location)
   }
 
   /**

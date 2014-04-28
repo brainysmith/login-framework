@@ -12,13 +12,13 @@ import scala.language.implicitConversions
 object Conf {
   import ServiceProvider.confService
 
-  val providers = confService.getPropsDeepGrouped("providers").map{
+  val providers = confService.getDeepMapString("providers").map{
     case (name, options) =>
       val meta = new ProviderMeta(name, options)
       name -> (meta.newInstance -> meta)
   }
 
-  val methods = confService.getPropsDeepGrouped("authnMethods").map{
+  val methods = confService.getDeepMapString("authnMethods").map{
     case (name, options) =>
       val meta = AuthnMethodMeta(name, options, resolveProvider)
       name -> (meta.newInstance -> meta)

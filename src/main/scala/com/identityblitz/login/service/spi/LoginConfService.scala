@@ -26,11 +26,21 @@ trait LoginConfService {
    */
   def getOptBoolean(implicit name: String): Option[Boolean]
 
-
-  def getPropsGrouped(prefix: String): Map[String, String]
+  /**
+   * Returns a [[Map]] with properties filtered by specified prefix where:
+   * <ul>
+   *   <li>key - is a substring of the property's name from the specified prefix to the next position of the dot (''.'')</li>
+   *   <li>value - value of the property</li>
+   * </ul>
+   *
+   * @param prefix - prefix of the properties to include to the result.
+   * @return [[Map]] with parameter name (exclude the specified prefix) and value. If there isn't configuration with
+   *        the specified name returns empty [[Map]].
+   */
+  def getMapString(prefix: String): Map[String, String]
 
   /**
-   * Returns a [[Map]] with properties filtered by specified prefix where
+   * Returns a [[Map]] with properties filtered by specified prefix where:
    * <ul>
    *   <li>key - is a substring of the property's name from the specified prefix to the next position of the dot (''.'')</li>
    *   <li>value - [[Map]] similarly grouped by current key </li>
@@ -39,6 +49,6 @@ trait LoginConfService {
    * @return [[Map]] with parameter name (exclude the specified prefix) and value grouped by keys (exclude the specified
    *        prefix). If there isn't configuration with the specified name returns empty [[Map]].
    */
-  def getPropsDeepGrouped(prefix: String): Map[String, Map[String, String]]
+  def getDeepMapString(prefix: String): Map[String, Map[String, String]]
 
 }
