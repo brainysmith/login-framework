@@ -4,7 +4,7 @@ import play.api.mvc._
 import scala.concurrent.{Promise, Future}
 import play.api.libs.iteratee.Done
 import com.identityblitz.scs.glue.play.{SCSEnabledAction, SCSRequest}
-import com.identityblitz.login.transport.{AjaxRedirectResponse, OutboundTransport, InboundTransport}
+import com.identityblitz.login.transport.{RedirectResponse, OutboundTransport, InboundTransport}
 import com.identityblitz.login.error.TransportException
 import play.api.Play
 import com.identityblitz.login._
@@ -220,7 +220,7 @@ private class PlayInboundTransport[A](private val req: SCSRequest[A],
      */
     def redirect(location: String): Unit = if(self.isAjax) {
       import com.identityblitz.login.glue.play.JUtil._
-      resultPromise.success(Ok(new AjaxRedirectResponse(location).jObj))
+      resultPromise.success(Ok(new RedirectResponse(location).jObj))
     }
     else {
       resultPromise.success(Redirect(location))

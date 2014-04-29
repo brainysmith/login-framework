@@ -1,11 +1,10 @@
 package com.identityblitz.login.glue.servlet;
 
-import com.identityblitz.json.JFactory;
 import com.identityblitz.login.*;
 import com.identityblitz.login.authn.method.AuthnMethod;
 import com.identityblitz.login.error.LoginException;
 import com.identityblitz.login.error.TransportException;
-import com.identityblitz.login.transport.AjaxRedirectResponse;
+import com.identityblitz.login.transport.RedirectResponse;
 import com.identityblitz.login.transport.InboundTransport;
 import com.identityblitz.login.transport.OutboundTransport;
 import com.identityblitz.scs.SCSService;
@@ -222,7 +221,7 @@ class ServletOutboundTransport implements OutboundTransport {
         try {
             if (isAjax) {
                 resp.setContentType("application/json");
-                resp.getWriter().write(new AjaxRedirectResponse(location).asString());
+                resp.getWriter().write(new RedirectResponse(location).asString());
             } else {
                 resp.sendRedirect(location);
             }
