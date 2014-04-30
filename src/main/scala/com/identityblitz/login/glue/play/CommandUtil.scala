@@ -10,7 +10,7 @@ import scala.Some
  */
 object CommandUtil {
 
-  def extractResponse[A](req: Request[A]): JsonResponse = {
+  def extractResponse[A](implicit req: Request[A]): JsonResponse = {
     val params = req.tags
     (params.get(COMMAND), params.get(COMMAND_NAME), params.get(REDIRECT)) match {
       case (_, _, Some(location)) => 

@@ -67,7 +67,7 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
 
 object ChangePswdCmd {
 
-  private[cmd] val COMMAND_NAME = "changePswd"
+  private[cmd] val COMMAND_NAME = "changePassword"
 
   def apply(cmd: ChangePswdCmd) = new ChangePswdCmd(cmd.providerName, cmd.userId, cmd.attempts + 1)
 
