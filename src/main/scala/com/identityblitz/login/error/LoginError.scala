@@ -31,7 +31,7 @@ object BuiltInErrors extends Enumeration {
   val NO_CREDENTIALS_FOUND = BuiltInError("no_credential_found")
   val ACCOUNT_IS_LOCKED = BuiltInError("account_is_locked")
   val PASSWORD_EXPIRED = BuiltInError("password_expired")
-  val WRONG_OLD_PASSWORD = BuiltInError("wrong_old_password")
+  val WRONG_CURRENT_PASSWORD = BuiltInError("wrong_current_password")
   val INAPPROPRIATE_NEW_PASSWORD = BuiltInError("inappropriate_new_password")
 
   implicit def valueToBuiltInError(v: Value): BuiltInError = v.asInstanceOf[BuiltInError]
