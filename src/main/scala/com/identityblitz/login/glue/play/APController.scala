@@ -173,7 +173,7 @@ private class PlayInboundTransport[A](private val req: SCSRequest[A],
   val outboundTransport = makeOutboundTransport
 
   @volatile private var forwarded = false
-  private val attributes = scala.collection.concurrent.TrieMap[String, String]()
+  private val attributes = scala.collection.concurrent.TrieMap[String, String](req.tags.filter(t => FlowAttrName.set.contains(t._1)).toSeq: _*)
   private val params = req.queryString.mapValues(seq => seq(0)) ++ formParams.mapValues(seq => seq(0))
 
   def getParameter(name: String): Option[String] = params.get(name)

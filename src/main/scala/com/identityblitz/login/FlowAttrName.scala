@@ -17,4 +17,6 @@ object FlowAttrName {
   val ERROR = "error"
 
   val REDIRECT = "redirect"
+
+  lazy val set = getClass.getDeclaredMethods.filter(_.getReturnType == classOf[String]).map(_.invoke(this).asInstanceOf[String]).toSet
 }
