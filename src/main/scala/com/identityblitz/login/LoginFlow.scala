@@ -93,7 +93,10 @@ abstract class LoginFlow extends Handler {
     val cbUrl = iTr.getLoginCtx.get.callbackUri
     logger.debug("The login flow is completed successfully [lc = {}]. Redirect to the following callback url: {}",
       iTr.toString, cbUrl)
-    oTr.redirect(cbUrl)
+    crackCallbackUrl(cbUrl) match {
+      case ("forward", u) => iTr.forward(u)
+      case ("redirect", u) => oTr.redirect(u)
+    }
   }
 
   /**
@@ -105,10 +108,16 @@ abstract class LoginFlow extends Handler {
    */
   final protected def endWithError(cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     val callbackUri = iTr.getLoginCtx.get.callbackUri
-    val errorParam = URLEncoder.encode("error=" + cause.name, "UTF-8")
-    val location = callbackUri + (if (callbackUri.contains("?")) "&" else "?") + errorParam
-    logger.debug("The login flow complete with error [{}] redirect to the following location: {}", cause, location)
-    oTr.redirect(location)
+    logger.debug("The login flow complete with error [{}] redirect to the following location: {}", cause, callbackUri)
+    crackCallbackUrl(callbackUri) match {
+      case ("forward", u) =>
+        iTr.setAttribute("error", cause.name)
+        iTr.forward(u)
+      case ("redirect", u) =>
+        val errorParam = URLEncoder.encode("error=" + cause.name, "UTF-8")
+        val location = callbackUri + (if (callbackUri.contains("?")) "&" else "?") + errorParam
+        oTr.redirect(location)
+    }
   }
 
   /**
@@ -131,6 +140,14 @@ abstract class LoginFlow extends Handler {
    * @param oTr - outbound transport
    */
   protected def nextForFail(cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport)
+
+  private val crackCallbackUrl = (s: String) => {
+    val extractor  = """^fwd:(.*)$""".r
+    extractor findFirstIn s match {
+      case Some(extractor(url)) => ("forward", url)
+      case _ => ("redirect", s)
+    }
+  }
 }
 
 private[login] object BuiltInLoginFlow extends LoginFlow {
