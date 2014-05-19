@@ -280,34 +280,3 @@ private object PlayInboundTransport {
     new PlayInboundTransport[A](req, params)
 
 }
-
-/*/**
- * Play outbound transport implementation
- */
-private class PlayOutboundTransport extends OutboundTransport {
-  private[play] val resultPromise = Promise[SimpleResult]
-  private val futureResult = resultPromise.future
-
-  @throws(classOf[TransportException])
-  def redirect[A](location: String)(implicit itr: InboundTransport): Unit = {
-    if("XMLHttpRequest" == itr.unwrap.asInstanceOf[RequestHeader].headers("X-Requested-With")) {
-      import com.identityblitz.login.glue.play.JUtil._
-      resultPromise.success(Ok(new AjaxRedirectResponse(location).jObj))
-    }
-    else {
-      resultPromise.success(Redirect(location))
-    }
-  }
-
-  def unwrap: AnyRef = {
-    throw new UnsupportedOperationException("OutboundTransport for Play application does not supported unwrap operation.")
-  }
-
-  def platform: Platform.Platform = Platform.PLAY
-
-  private[play] def result[A](implicit itr: PlayInboundTransport[A]): Future[SimpleResult] = {
-    if(!itr.isForwarded && !resultPromise.isCompleted)
-      resultPromise.success(NotFound)
-    futureResult
-  }
-}*/
