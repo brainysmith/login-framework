@@ -187,7 +187,7 @@ private class PlayInboundTransport[A](private val req: SCSRequest[A],
     outboundTransport.resultPromise.completeWith {
       Play.application.routes.get.routes.apply(DispatchRequestHeader(path)) match {
         case a: EssentialAction =>
-          a.apply(Request(req.copy(tags = req.tags ++ attributes + ("FORWARDED" -> "true")), req.body)).run
+          a.apply(SCSRequest(req.getSCS, req.copy(tags = req.tags ++ attributes + ("FORWARDED" -> "true")), req.body)).run
         case e: Throwable => throw new TransportException(e)
       }
     }
