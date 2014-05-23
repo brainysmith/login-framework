@@ -1,8 +1,8 @@
-package com.identityblitz.login.authn.cmd
+package com.identityblitz.login.cmd
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json.{Json, JVal}
-import com.identityblitz.login.LoggingUtils._
+import com.identityblitz.login.App.logger
 import com.identityblitz.login.error.CommandException
 import com.identityblitz.login.util.Base64Util._
 

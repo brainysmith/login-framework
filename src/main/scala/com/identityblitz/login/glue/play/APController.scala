@@ -11,9 +11,10 @@ import com.identityblitz.login._
 import play.api.mvc.Results._
 import play.api.Play.current
 import java.util.regex.Pattern
-import com.identityblitz.login.authn.method.AuthnMethod
 import play.api.mvc.SimpleResult
 import scala.util.{Failure, Success, Try}
+import com.identityblitz.login.provider.method.ActiveMethodProvider
+import com.identityblitz.login.App.logger
 
 /**
  * The Authentication Point (AP) controller is the endpoint for Play applications written on Scala language
@@ -55,8 +56,8 @@ object APController extends Controller {
 
   val loginPath = "/login/"
 
-  val authMethods: Map[String, AuthnMethod] = Conf.methods.mapValues(_._1)
-  val flowEngine = Conf.loginFlow
+  val authMethods: Map[String, ActiveMethodProvider] = App.methods.filter(_._2.activeProvider.isDefined).mapValues(_.activeProvider.get)
+  val flowEngine = App.loginFlow.provider
 
   /**
    * The entry point action of the AP for request made by HTTP method GET. For this action the specific route
@@ -111,14 +112,14 @@ object APController extends Controller {
         case Call("flow", null, true) => flowEngine.start
         case Call("flow", null, false) =>
           itr.setAttribute(FlowAttrName.CALLBACK_URI_NAME, itr.getParameter(FlowAttrName.CALLBACK_URI_NAME).fold[String]{
-            LoggingUtils.logger.error("callback_uri is not specified.")
+            logger.error("callback_uri is not specified.")
             throw new IllegalArgumentException("callback_uri is not specified.")
           }(s => s))
           itr.getParameter(FlowAttrName.AUTHN_METHOD_NAME).foreach(itr.setAttribute(FlowAttrName.AUTHN_METHOD_NAME, _))
           flowEngine.start
         case Call(m, "/do", _) => authMethods(m).DO
         case c @ Call(_, _, _) =>
-          LoggingUtils.logger.error("Got a wrong call: {}.", c)
+          logger.error("Got a wrong call: {}.", c)
           throw new IllegalArgumentException("Got a wrong call: " + c + ".")
       }
     }
@@ -129,7 +130,7 @@ object APController extends Controller {
 
     val (method, action) = Option(pattern.matcher(handler)).filter(_.find())
       .fold[(String, String)]{
-      LoggingUtils.logger.error("Got wrong handler: {}.", handler)
+      logger.error("Got wrong handler: {}.", handler)
       throw new Error("Got wrong handler: " + handler + ".")
     }(m => (m.group(1), m.group(2)))
   }
@@ -195,17 +196,19 @@ private class PlayInboundTransport[A](private val req: SCSRequest[A],
 
   val isAjax = "XMLHttpRequest" == req.headers.get("X-Requested-With").getOrElse("")
 
-  def unwrap: AnyRef = req
+  override def unwrap: AnyRef = req
 
-  def platform: Platform.Platform = Platform.PLAY
+  override def platform: Platform.Platform = Platform.PLAY
 
-  def getLoginCtx: Option[LoginContext] = req.getSCS.map(s => LoginContext.fromString(s))
+  override def getLoginCtx: Option[LoginContext] = req.getSCS.map(s => LoginContext.fromString(s))
 
-  def updatedLoginCtx(loginCtx: LoginContext): Unit = { req.changeSCS(Option(loginCtx).map(_.asString)) }
+  override def updatedLoginCtx(loginCtx: LoginContext): Unit = { req.changeSCS(Option(loginCtx).map(_.asString)) }
 
-  def getAttribute(name: String): Option[String] = attributes.get(name)
+  override def getAttribute(name: String): Option[String] = attributes.get(name)
 
-  def setAttribute(name: String, value: String): Unit = {attributes(name) = value}
+  override def setAttribute(name: String, value: String): Unit = {attributes(name) = value}
+
+  override def removeAttribute(name: String): Unit = attributes -= name
 
   private def isForwarded = forwarded
 

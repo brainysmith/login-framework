@@ -1,11 +1,11 @@
-package com.identityblitz.login.authn.cmd
+package com.identityblitz.login.cmd
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json._
-import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.{LoginContext, Conf}
+import com.identityblitz.login.App.logger
+import com.identityblitz.login.{LoginContext, App}
 import com.identityblitz.login.error.{CustomLoginError, LoginError, CommandException}
-import com.identityblitz.login.authn.provider.{WithBind, Provider}
+import com.identityblitz.login.provider.{WithBind, Provider}
 
 /**
   */
@@ -26,7 +26,7 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
     err
   })
 
-  lazy val bindProviders = Conf.methods(methodName)._2.bindProviders.ensuring(!_.isEmpty, {
+  lazy val bindProviders = App.methods(methodName).bindProviders.ensuring(!_.isEmpty, {
     val err = s"No bind provider found [authentication method = $methodName]. Check the configuration."
     logger.error(err)
     throw new IllegalStateException(err)
@@ -52,7 +52,7 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
       value <- itr.getParameter(name)
     } yield (name, value)).toMap
 
-    def doBind(providers: Array[Provider with WithBind],
+    def doBind(providers: Seq[Provider with WithBind],
                data: Map[String, String]) :Either[Seq[(String, LoginError)], (JObj, Option[Command])] = {
       providers.foldLeft[Either[Seq[(String, LoginError)], (JObj, Option[Command])]]{
         Left(Seq(("", CustomLoginError("no_provider_found"))))}{

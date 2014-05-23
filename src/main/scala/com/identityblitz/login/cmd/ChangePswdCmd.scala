@@ -1,12 +1,12 @@
-package com.identityblitz.login.authn.cmd
+package com.identityblitz.login.cmd
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json._
 import com.identityblitz.login.error.CommandException
 import com.identityblitz.login.error.BuiltInErrors._
-import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.{LoginContext, Conf}
-import com.identityblitz.login.authn.provider.{Provider, WithChangePswd}
+import com.identityblitz.login.App.logger
+import com.identityblitz.login.{LoginContext, App}
+import com.identityblitz.login.provider.WithChangePassword
 
 
 /**
@@ -27,7 +27,9 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
     err    
   })
 
-  lazy val provider = Conf.providers.get(providerName).map(_._1).map(_.asInstanceOf[Provider with WithChangePswd]).getOrElse({
+  lazy val provider = App.providers.get(providerName)
+    .filter(p => classOf[WithChangePassword].isAssignableFrom(p.getClass))
+    .map(_.asInstanceOf[WithChangePassword]).getOrElse({
     val err = s"Provider with specified name '$providerName' is not configured."
     logger.error(err)
     throw new IllegalArgumentException(err)

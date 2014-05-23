@@ -1,16 +1,16 @@
 package com.identityblitz.login.glue.servlet;
 
 import com.identityblitz.login.*;
-import com.identityblitz.login.authn.method.AuthnMethod;
 import com.identityblitz.login.error.LoginException;
 import com.identityblitz.login.error.TransportException;
-import com.identityblitz.login.transport.RedirectResponse;
+import com.identityblitz.login.provider.WithStart;
+import com.identityblitz.login.provider.method.ActiveMethodProvider;
 import com.identityblitz.login.transport.InboundTransport;
 import com.identityblitz.login.transport.OutboundTransport;
+import com.identityblitz.login.transport.RedirectResponse;
 import com.identityblitz.scs.SCSService;
 import scala.Enumeration;
 import scala.Option;
-import scala.Tuple2;
 import scala.collection.convert.WrapAsJava$;
 
 import javax.servlet.ServletException;
@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.identityblitz.login.LoggingUtils.logger;
+import static com.identityblitz.login.App.logger;
 
 /**
  * The Authentication Point (AP) servlet is the endpoint for Java Servlet based application
@@ -65,17 +65,18 @@ import static com.identityblitz.login.LoggingUtils.logger;
 public class APServlet extends HttpServlet {
     private static final Pattern pattern = Pattern.compile("login/([^/]+)(/do)?", Pattern.CASE_INSENSITIVE);
 
-    private Map<String, Handler> handlers;
+    private Map<String, WithStart> handlers;
 
     @Override
     public void init() throws ServletException {
-        handlers = new HashMap<String, Handler>(Conf$.MODULE$.methods().size() + 1);
+        handlers = new HashMap<String, WithStart>(App$.MODULE$.methods().size() + 1);
 
-        for(Map.Entry<String, Tuple2<AuthnMethod, AuthnMethodMeta>> entry : WrapAsJava$.MODULE$.mapAsJavaMap(
-                Conf$.MODULE$.methods()).entrySet()) {
-            handlers.put(entry.getKey(), entry.getValue()._1());
+        for(Map.Entry<String, AuthnMethod> entry : WrapAsJava$.MODULE$.mapAsJavaMap(
+                App$.MODULE$.methods()).entrySet()) {
+            if (entry.getValue().activeProvider().isDefined())
+                handlers.put(entry.getKey(), entry.getValue().activeProvider().get());
         }
-        handlers.put("flow", Conf.loginFlow());
+        handlers.put("flow", App.loginFlow().provider());
     }
 
     @Override
@@ -123,7 +124,7 @@ public class APServlet extends HttpServlet {
 
             try {
                 if ("/do".equalsIgnoreCase(action)) {
-                    ((AuthnMethod)handlers.get(method)).DO(itr, otr);
+                    ((ActiveMethodProvider)handlers.get(method)).DO(itr, otr);
                 } else {
                     handlers.get(method).start(itr, otr);
                 }
@@ -190,6 +191,11 @@ class ServletInboundTransport implements InboundTransport {
     @Override
     public void setAttribute(String name, String value) {
         req.setAttribute(name, value);
+    }
+
+    @Override
+    public void removeAttribute(String name) {
+        req.removeAttribute(name);
     }
 
     @Override

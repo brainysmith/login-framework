@@ -72,5 +72,7 @@ trait InboundTransport {
    */
   def setAttribute(name: String, value: String)
 
+  def removeAttribute(name: String)
+
   //def getParameterMap: Map[String, Array[String]]
 }

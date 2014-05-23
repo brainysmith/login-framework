@@ -1,29 +1,25 @@
-package com.identityblitz.login.authn.method
+package com.identityblitz.login.provider.method
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
-import com.identityblitz.login.{Conf, FlowAttrName, Handler}
+import com.identityblitz.login.FlowAttrName
 import com.identityblitz.login.error.{BuiltInErrors, CommandException, LoginException}
-import com.identityblitz.login.authn.cmd.Command
-import com.identityblitz.login.LoggingUtils._
+import com.identityblitz.login.cmd.Command
+import com.identityblitz.login.App.{logger, methods, loginFlow}
 import scala.util.control.NonFatal
+import com.identityblitz.login.provider.{WithDo, WithStart, Provider}
+
+
+trait PassiveMethodProvider extends Provider with WithDo {
+
+  def authnMethod(implicit iTr: InboundTransport, oTr: OutboundTransport) = methods(iTr.getLoginCtx.get.method)
+
+}
 
 /**
  *
- * important: an implementation must have the constructor with following signature:
- * ''(name:String, options: Map[String, String])''.
   */
-abstract class AuthnMethod(val name:String, val options: Map[String, String]) extends Handler {
-
-  /**
-   * The method is called each time before a new authentication method is started. The method makes it possible to do
-   * some preparatory actions (e.g. generate challenge) and return forward or redirect request to a specific for
-   * the current method login url.
-   * @param iTr - inbound transport
-   * @param oTr - outbound transport
-   */
-  @throws(classOf[LoginException])
-  def start(implicit iTr: InboundTransport, oTr: OutboundTransport)
-
+trait ActiveMethodProvider extends PassiveMethodProvider with WithStart {
+ 
   /**
    *
    * @param cmd
@@ -82,18 +78,18 @@ abstract class AuthnMethod(val name:String, val options: Map[String, String]) ex
         case Left(cmdException) =>
           logger.debug("No any recovery command specified for the command exception [authnMethod = {}]: {}",
             name, cmdException)
-          Conf.loginFlow.fail(name, cmdException.error)
+          loginFlow.provider.fail(cmdException.error)
         case Right(Some(cmd)) =>
           logger.debug("Authentication method '{}' is not completed yet. Send a new command: {}", name, cmd)
           sendCommand(cmd)
         case Right(None) =>
           logger.debug("Authentication method '{}' is completed successfully.", name)
-          Conf.loginFlow.success(name)
+          loginFlow.provider.success
       }
     } catch {
       case NonFatal(e) =>
         logger.error("During executing command an internal error has occurred [authnMethod = {}]: {}. ", name, e)
-        Conf.loginFlow.fail(name, BuiltInErrors.INTERNAL)
+        loginFlow.provider.fail(BuiltInErrors.INTERNAL)
     }
   }
 }

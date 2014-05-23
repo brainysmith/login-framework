@@ -1,7 +1,7 @@
 package com.identityblitz.login.error
 
-import com.identityblitz.login.authn.cmd.Command
-import com.identityblitz.login.LoggingUtils._
+import com.identityblitz.login.cmd.Command
+import com.identityblitz.login.App.logger
 
 /**
   */

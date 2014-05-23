@@ -1,15 +1,15 @@
-package com.identityblitz.login.authn.method
+package com.identityblitz.login.provider.method
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
-import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.authn.cmd.{ChangePswdCmd, BindCommand, Command}
+import com.identityblitz.login.App.logger
+import com.identityblitz.login.cmd.{ChangePswdCmd, BindCommand, Command}
 import com.identityblitz.login.error.CommandException
 import com.identityblitz.login.error.BuiltInErrors._
-import com.identityblitz.login.authn.method.PasswordBaseMethod.FormParams
+import com.identityblitz.login.provider.method.PasswordBaseMethodProvider.FormParams
 
 /**
  */
-class PasswordBaseMethod(name: String, options: Map[String, String]) extends AuthnMethod(name, options) {
+class PasswordBaseMethodProvider(val name: String, val options: Map[String, String]) extends ActiveMethodProvider {
 
   private val pageController = options.get("page-controller").getOrElse({
     val err = "The password base method can't be instantiate because a page controller path not specified. " +
@@ -18,8 +18,8 @@ class PasswordBaseMethod(name: String, options: Map[String, String]) extends Aut
     throw new IllegalStateException(err)
   })
 
-  override def start(implicit req: InboundTransport, resp: OutboundTransport): Unit = {
-    sendCommand(BindCommand(name, FormParams.allParams))
+  override def start(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
+    sendCommand(BindCommand(authnMethod.name, FormParams.allParams))
   }
 
   override protected def route(cmd: Command)(implicit iTr: InboundTransport, oTr: OutboundTransport): String = pageController
@@ -37,7 +37,7 @@ class PasswordBaseMethod(name: String, options: Map[String, String]) extends Aut
   }
 }
 
-object PasswordBaseMethod {
+object PasswordBaseMethodProvider {
 
   object FormParams extends Enumeration {
     import scala.language.implicitConversions

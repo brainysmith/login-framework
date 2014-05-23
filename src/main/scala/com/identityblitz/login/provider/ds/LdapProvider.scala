@@ -1,16 +1,15 @@
-package com.identityblitz.login.authn.provider
+package com.identityblitz.login.provider.ds
 
-import com.identityblitz.login.LoggingUtils._
+import com.identityblitz.login.App.logger
 import com.unboundid.ldap.sdk._
 import com.unboundid.util.ssl.{TrustAllTrustManager, SSLUtil}
-import com.identityblitz.login.authn.provider.LdapBindProvider._
 import scala.collection
 import com.identityblitz.json._
 import scala.util.Try
-import com.identityblitz.login.authn.provider.AttrType.AttrType
-import com.identityblitz.login.authn.cmd.{ChangePswdCmd, Command}
+import com.identityblitz.login.cmd.{ChangePswdCmd, Command}
 import com.unboundid.ldap.sdk.controls.PasswordExpiredControl
-import com.identityblitz.login.authn.method.PasswordBaseMethod.FormParams
+import com.identityblitz.login.provider.method.PasswordBaseMethodProvider
+import PasswordBaseMethodProvider.FormParams
 import com.identityblitz.login.error.LoginError
 import com.identityblitz.login.error.BuiltInErrors._
 import scala.util.Failure
@@ -18,10 +17,13 @@ import scala.Some
 import scala.util.Success
 import com.identityblitz.login.error.CustomLoginError
 import com.unboundid.ldap.sdk.extensions.{PasswordModifyExtendedResult, PasswordModifyExtendedRequest}
+import com.identityblitz.login.provider.{WithChangePassword, WithBind, Provider}
+import LdapBindProvider._
+import com.identityblitz.login.provider.ds.AttrType.AttrType
 
 /**
  */
-class LdapBindProvider(name:String, options: Map[String, String]) extends Provider(name, options) with WithBind with WithChangePswd {
+class LdapBindProvider(val name:String, val options: Map[String, String]) extends Provider with WithBind with WithChangePassword {
 
   logger.trace("initializing the '{}' LDAP bind provider [options={}]", name, options)
 

@@ -1,50 +1,52 @@
 package com.identityblitz.login
 
 import com.identityblitz.login.service.ServiceProvider
-import com.identityblitz.login.LoggingUtils._
-import com.identityblitz.login.authn.method.AuthnMethod
-import com.identityblitz.login.authn.provider.{WithAttributes, WithBind, Provider}
-import com.identityblitz.login.util.Reflection
+import com.identityblitz.login.provider.Provider
 import scala.language.implicitConversions
+import org.slf4j.LoggerFactory
 
 /**
  */
-object Conf {
+object App {
   import ServiceProvider.confService
 
-  val providers = confService.getDeepMapString("providers").map{
+  val logger = LoggerFactory.getLogger("com.identityblitz.login-framework")
+
+  //val sessionCookieName = confService.getOptString("sessionCookieName").getOrElse("blitz_session")
+
+/*  val providers = confService.getDeepMapString("providers").map{
     case (name, options) =>
       val meta = new ProviderMeta(name, options)
       name -> (meta.newInstance -> meta)
-  }
+  }*/
 
-  val methods = confService.getDeepMapString("authnMethods").map{
+/*  val methods = confService.getDeepMapString("authnMethods").map{
     case (name, options) =>
       val meta = AuthnMethodMeta(name, options, resolveProvider)
       name -> (meta.newInstance -> meta)
-  }
+  }*/
 
-  val loginFlow = confService.getOptString("loginFlow").fold[LoginFlow]({
-    logger.debug("Will use the built-in login flow: {}", BuiltInLoginFlow.getClass.getSimpleName)
-    BuiltInLoginFlow
-  })(className => {
-    logger.debug("Find in the configuration a custom login flow [class = {}]", className)
-    Reflection.getConstructor(className).apply().asInstanceOf[LoginFlow]
-  })
-
-  def resolveProvider(name: String) = providers.get(name).getOrElse({
+/*  def resolveProvider(name: String) = providers.get(name).getOrElse({
     val err = s"Provider with name $name is not found"
     logger.error(err)
     throw new IllegalArgumentException(err)
-  })._1
+  })
 
   def resolveMethod(name: String) = methods.get(name).getOrElse({
     val err = s"Authentication method with name $name is not found"
     logger.error(err)
     throw new IllegalArgumentException(err)
-  })._1
+  })*/
+
+  lazy val providers: Map[String, Provider] = confService.getDeepMapString("providers").map(t => t._1 -> Provider(t))
+
+  lazy val methods = confService.getDeepMapString("authn-methods").map(t => t._1 -> AuthnMethod(t._1, t._2, providers))
+
+  lazy val loginFlow = LoginFlow(confService.getMapString("login-flow"), providers)
+
 }
 
+/*
 case class ProviderMeta(name: String, options: Map[String, String]) extends Instantiable[Provider] {
 
   private object Options extends Enumeration {
@@ -71,7 +73,7 @@ case class ProviderMeta(name: String, options: Map[String, String]) extends Inst
 }
 
 case class AuthnMethodMeta(name: String, options: Map[String, String],
-                           private val resolveProvider: (String) => Provider) extends Instantiable[AuthnMethod] {
+                           private val resolveProvider: (String) => Provider) extends Instantiable[ActiveMethodProvider] {
 
   private object Options extends Enumeration {
     import scala.language.implicitConversions
@@ -130,4 +132,4 @@ sealed trait Instantiable[A] {
 
   def newInstance: A = classConstructor.apply(initArgs:_*).asInstanceOf[A]
 
-}
+}*/

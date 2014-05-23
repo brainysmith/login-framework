@@ -18,5 +18,9 @@ object FlowAttrName {
 
   val REDIRECT = "redirect"
 
+  val LOGIN_CONTEXT = "lc"
+
+  val PASSIVE_PROVIDER_ATTR_NAME = "authnPassiveProviders"
+
   lazy val set = getClass.getDeclaredMethods.filter(_.getReturnType == classOf[String]).map(_.invoke(this).asInstanceOf[String]).toSet
 }
