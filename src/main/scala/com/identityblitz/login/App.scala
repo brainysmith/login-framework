@@ -14,36 +14,22 @@ object App {
 
   //val sessionCookieName = confService.getOptString("sessionCookieName").getOrElse("blitz_session")
 
-/*  val providers = confService.getDeepMapString("providers").map{
-    case (name, options) =>
-      val meta = new ProviderMeta(name, options)
-      name -> (meta.newInstance -> meta)
-  }*/
+  lazy val providers: Map[String, Provider] = confService.getDeepMapString("providers").map(t => t._1 -> Handler(t))
 
-/*  val methods = confService.getDeepMapString("authnMethods").map{
-    case (name, options) =>
-      val meta = AuthnMethodMeta(name, options, resolveProvider)
-      name -> (meta.newInstance -> meta)
-  }*/
-
-/*  def resolveProvider(name: String) = providers.get(name).getOrElse({
-    val err = s"Provider with name $name is not found"
-    logger.error(err)
-    throw new IllegalArgumentException(err)
-  })
-
-  def resolveMethod(name: String) = methods.get(name).getOrElse({
-    val err = s"Authentication method with name $name is not found"
-    logger.error(err)
-    throw new IllegalArgumentException(err)
-  })*/
-
-  lazy val providers: Map[String, Provider] = confService.getDeepMapString("providers").map(t => t._1 -> Provider(t))
-
-  lazy val methods = confService.getDeepMapString("authn-methods").map(t => t._1 -> AuthnMethod(t._1, t._2, providers))
+  lazy val methods: Map[String, AuthnMethod] = confService.getDeepMapString("authn-methods").map(t => t._1 -> Handler(t))
 
   lazy val loginFlow = LoginFlow(confService.getMapString("login-flow"), providers)
 
+
+  def findProvider[A](name: Option[String], classes: Class[_]*) = name.flatMap(providers.get)
+    .filter(p => classes.forall(cls => {cls.isAssignableFrom(p.getClass)}))
+    .map(_.asInstanceOf[A])
+    .orElse{
+    if (logger.isDebugEnabled)
+      logger.warn("Authentication method '{}': '{}' not specified or it not implements '{}'",
+        name, classes.map(_.getSimpleName))
+    None
+  }
 }
 
 /*

@@ -1,4 +1,4 @@
-package com.identityblitz.login.provider.ds
+package com.identityblitz.login.provider
 
 import com.identityblitz.login.App.logger
 import com.unboundid.ldap.sdk._
@@ -8,8 +8,8 @@ import com.identityblitz.json._
 import scala.util.Try
 import com.identityblitz.login.cmd.{ChangePswdCmd, Command}
 import com.unboundid.ldap.sdk.controls.PasswordExpiredControl
-import com.identityblitz.login.provider.method.PasswordBaseMethodProvider
-import PasswordBaseMethodProvider.FormParams
+import com.identityblitz.login.method.PasswordBaseMethod
+import PasswordBaseMethod.FormParams
 import com.identityblitz.login.error.LoginError
 import com.identityblitz.login.error.BuiltInErrors._
 import scala.util.Failure
@@ -17,9 +17,8 @@ import scala.Some
 import scala.util.Success
 import com.identityblitz.login.error.CustomLoginError
 import com.unboundid.ldap.sdk.extensions.{PasswordModifyExtendedResult, PasswordModifyExtendedRequest}
-import com.identityblitz.login.provider.{WithChangePassword, WithBind, Provider}
 import LdapBindProvider._
-import com.identityblitz.login.provider.ds.AttrType.AttrType
+import com.identityblitz.login.provider.AttrType.AttrType
 
 /**
  */

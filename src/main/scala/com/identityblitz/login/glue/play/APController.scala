@@ -13,7 +13,7 @@ import play.api.Play.current
 import java.util.regex.Pattern
 import play.api.mvc.SimpleResult
 import scala.util.{Failure, Success, Try}
-import com.identityblitz.login.provider.method.ActiveMethodProvider
+import com.identityblitz.login.method.ActiveMethodProvider
 import com.identityblitz.login.App.logger
 
 /**

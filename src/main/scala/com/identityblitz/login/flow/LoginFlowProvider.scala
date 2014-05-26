@@ -1,32 +1,37 @@
-package com.identityblitz.login.provider.flow
+package com.identityblitz.login.flow
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
-import com.identityblitz.login.App._
+import com.identityblitz.login.App.logger
 import scala.annotation.implicitNotFound
 import com.identityblitz.login.error.{BuiltInErrors, LoginError, LoginException}
 import com.identityblitz.login.FlowAttrName._
 import com.identityblitz.login.LoginContext._
 import java.net.URLEncoder
 import com.identityblitz.scs.SCSService
-import com.identityblitz.login.provider.{WithStart, Provider}
-import com.identityblitz.login.{AuthnMethod, FlowAttrName, LoginContext}
+import com.identityblitz.login._
+import scala.Some
+import com.identityblitz.login.provider.{WithBind, Provider}
 
 /**
  * Defines a flow of the login process.
  * The implementation must be a singleton.
  */
 @implicitNotFound("No implicit inbound or outbound found.")
-trait LoginFlowProvider extends Provider with WithStart {
+trait LoginFlowProvider extends Handler with WithName with WithStart {
 
-  protected val scsService = new SCSService()
-  scsService.init(false)
-
-
-  protected val defaultAuthnMethod = methods.find(_._2.default).map(_._1).orElse{
-    logger.warn("A default login method not specified in the configuration. To fix this fix add a parameter " +
-      "'default = true' to an one authentication method")
-    None
+  protected lazy val scsService = {
+    val scs = new SCSService()
+    scs.init(false)
+    scs
   }
+
+  protected lazy val methods = options.get("methods")
+    .map(_.split(",").map(_.trim).filter(!_.isEmpty))
+    .getOrElse[Array[String]](Array.empty)
+    .flatMap(pName => App.findProvider[AuthnMethod](Some(pName), classOf[AuthnMethod]))
+    .toList
+
+
 
   /**
    * Starts a new authentication method. If login context (LC) is not found it will be created.
@@ -192,6 +197,11 @@ trait LoginFlowProvider extends Provider with WithStart {
       case _ => ("redirect", s)
     }
   }
+}
+
+object MethodFlag extends Enumeration {
+  type MethodFlag = Value
+  val sufficient, required = Value
 }
 
 

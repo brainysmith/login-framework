@@ -1,7 +1,7 @@
 package com.identityblitz.login
 
 import com.identityblitz.login.provider.Provider
-import com.identityblitz.login.provider.flow.{DefaultLoginFlowProvider, LoginFlowProvider}
+import com.identityblitz.login.flow.{DefaultLoginFlowProvider, LoginFlowProvider}
 import App.logger
 
 case class LoginFlow(provider: LoginFlowProvider)

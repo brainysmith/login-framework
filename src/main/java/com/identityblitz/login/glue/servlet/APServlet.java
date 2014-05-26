@@ -4,7 +4,7 @@ import com.identityblitz.login.*;
 import com.identityblitz.login.error.LoginException;
 import com.identityblitz.login.error.TransportException;
 import com.identityblitz.login.provider.WithStart;
-import com.identityblitz.login.provider.method.ActiveMethodProvider;
+import com.identityblitz.login.method.ActiveMethodProvider;
 import com.identityblitz.login.transport.InboundTransport;
 import com.identityblitz.login.transport.OutboundTransport;
 import com.identityblitz.login.transport.RedirectResponse;

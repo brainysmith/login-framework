@@ -1,15 +1,16 @@
-package com.identityblitz.login.provider.method
+package com.identityblitz.login.method
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.App.logger
 import com.identityblitz.login.cmd.{ChangePswdCmd, BindCommand, Command}
 import com.identityblitz.login.error.CommandException
 import com.identityblitz.login.error.BuiltInErrors._
-import com.identityblitz.login.provider.method.PasswordBaseMethodProvider.FormParams
+import com.identityblitz.login.method.PasswordBaseMethod.FormParams
+import com.identityblitz.login.AuthnMethod
 
 /**
  */
-class PasswordBaseMethodProvider(val name: String, val options: Map[String, String]) extends ActiveMethodProvider {
+class PasswordBaseMethod(val name: String, val options: Map[String, String]) extends AuthnMethod {
 
   private val pageController = options.get("page-controller").getOrElse({
     val err = "The password base method can't be instantiate because a page controller path not specified. " +
@@ -18,26 +19,36 @@ class PasswordBaseMethodProvider(val name: String, val options: Map[String, Stri
     throw new IllegalStateException(err)
   })
 
-  override def start(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
-    sendCommand(BindCommand(authnMethod.name, FormParams.allParams))
-  }
+  private val invoker = InvokeBuilder
+    .withRecover(recover)
+    .onSuccess(onSuccess)
+    .build()
 
-  override protected def route(cmd: Command)(implicit iTr: InboundTransport, oTr: OutboundTransport): String = pageController
-
-  override protected def recover(cmdException: CommandException)
-                                (implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+  protected def recover(cmdException: CommandException, iTr: InboundTransport, oTr: OutboundTransport) = {
     cmdException.cmd -> cmdException.error match {
       case (bindCmd: BindCommand, INVALID_CREDENTIALS | NO_SUBJECT_FOUND | NO_CREDENTIALS_FOUND) =>
-        Right(Some(BindCommand(bindCmd)))
+        Right(BindCommand(bindCmd))
       case (changePswdCmd: ChangePswdCmd, INVALID_CREDENTIALS | NO_CREDENTIALS_FOUND) =>
-        Right(Some(ChangePswdCmd(changePswdCmd)))
+        Right(ChangePswdCmd(changePswdCmd))
       case _ =>
         Left(cmdException)
     }
   }
+  
+  protected def onSuccess(cmd: Option[Command], iTr: InboundTransport, oTr: OutboundTransport) =
+    cmd.fold(loginFlow.success)(sendCommand(_, pageController))
+
+
+  override def start(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
+    sendCommand(BindCommand(name, FormParams.allParams), pageController)
+  }
+
+  override def DO(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
+    invoker(getCommand, iTr, oTr)
+  }
 }
 
-object PasswordBaseMethodProvider {
+object PasswordBaseMethod {
 
   object FormParams extends Enumeration {
     import scala.language.implicitConversions

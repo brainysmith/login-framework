@@ -1,45 +1,44 @@
 package com.identityblitz.login
 
 import com.identityblitz.login.provider.{WithBind, Provider}
-import com.identityblitz.login.provider.method.{PassiveMethodProvider, ActiveMethodProvider}
 import App.logger
+import com.identityblitz.login.cmd.{Command, CommandTools}
+import com.identityblitz.login.error.BuiltInErrors
+import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 
 
 /**
  */
-case class AuthnMethod(name: String, activeProvider: Option[ActiveMethodProvider] = None,
-                       passiveProviders: List[PassiveMethodProvider] = List.empty,
-                       bindProviders: List[Provider with WithBind] = List.empty, default: Boolean = false)
+trait AuthnMethod extends Handler with WithName with WithStart with WithDo with CommandTools {
+
+  protected lazy val loginFlow = App.loginFlow.provider
+
+  protected lazy val bindProviders =  options.get("bind-providers").map(_.split(","))
+    .getOrElse[Array[String]](Array.empty)
+    .flatMap(pName => App.findProvider[Provider with WithBind](Some(pName), classOf[Provider], classOf[WithBind]))
+
+  protected def InvokeBuilder = new InvokeBuilder()
+    .onFatal((e, iTr, oTr) => {
+    loginFlow.fail(BuiltInErrors.INTERNAL)
+  })
+    .onFail((cmdException, iTr, oTr) => {
+    iTr.setAttribute(FlowAttrName.ERROR, cmdException.error.name)
+    loginFlow.fail(cmdException.error)
+  })
 
 
-object AuthnMethod {
-
-  def apply(name: String, options: Map[String, String], providers: Map[String, Provider]): AuthnMethod = {
-    def findProvider[A](name: Option[String], classes: Class[_]*) = name.flatMap(providers.get)
-      .filter(p => classes.forall(cls => {cls.isAssignableFrom(p.getClass)}))
-      .map(_.asInstanceOf[A])
-      .orElse{
-      if (logger.isDebugEnabled)
-        logger.warn("Authentication method '{}': '{}' not specified or it not implements '{}'",
-          name, classes.map(_.getSimpleName))
-      None
-    }
-
-    val activeProvider = findProvider(options.get("active-provider"), classOf[ActiveMethodProvider])
-
-    val passiveProvider = options.get("passive-provider").map(_.split(","))
-      .getOrElse[Array[String]](Array())
-      .flatMap(pName => findProvider[PassiveMethodProvider](Some(pName), classOf[PassiveMethodProvider]))
-
-    val bindProviders =  options.get("bind-providers").map(_.split(","))
-      .getOrElse[Array[String]]({
-        logger.warn(s"Configuration warning: 'bind-providers' is not specified for '$name' authentication method.")
-        Array()})
-      .flatMap(pName => findProvider[Provider with WithBind](Some(pName), classOf[Provider], classOf[WithBind]))
-
-    val default = options.get("default").exists(_.toBoolean)
-
-    apply(name, activeProvider, passiveProvider.toList, bindProviders.toList, default)
+  protected def sendCommand(cmd: Command, path: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    iTr.setAttribute(FlowAttrName.COMMAND_NAME, cmd.name)
+    iTr.setAttribute(FlowAttrName.COMMAND, cmd.asString())
+    iTr.forward(path)
   }
+
+
+  protected def getCommand(implicit iTr: InboundTransport, oTr: OutboundTransport) = iTr.getParameter(FlowAttrName.COMMAND).fold[Command]{
+    val err = s"The request parameter '${FlowAttrName.COMMAND}' not specified"
+    logger.error(err)
+    throw new IllegalArgumentException(err)
+  }(Command[Command])
+
 
 }
