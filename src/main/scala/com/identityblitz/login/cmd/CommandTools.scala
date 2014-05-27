@@ -11,23 +11,23 @@ trait CommandTools {
 
   protected class InvokeBuilder(val recover: (CommandException, InboundTransport, OutboundTransport) => Either[CommandException, Command] =
                       (cmdException: CommandException, iTr: InboundTransport, oTr: OutboundTransport) => Left(cmdException),
-                      val onSuccess: (Option[Command], InboundTransport, OutboundTransport) => Unit = {},
-                      val onFail: (CommandException,  InboundTransport, OutboundTransport) => Unit = {},
-                      val onFatal: (Throwable, InboundTransport, OutboundTransport) => Unit = {}) {
+                      val onSuccess: (Option[Command], InboundTransport, OutboundTransport) => Unit = (cmd, iTr, oTr) => {},
+                      val onFail: (CommandException,  InboundTransport, OutboundTransport) => Unit = (e, iTr, oTr) => {},
+                      val onFatal: (Throwable, InboundTransport, OutboundTransport) => Unit = (e, iTr, oTr) => {}) {
     
     def withRecover(rf: (CommandException, InboundTransport, OutboundTransport) => Either[CommandException, Command]) = new InvokeBuilder(rf, onSuccess, onFail, onFatal)
-    def onSuccess(success: (Option[Command], InboundTransport, OutboundTransport) => Unit) = new InvokeBuilder(recover, success, onFail, onFatal)
-    def onFail(fail: (CommandException, InboundTransport, OutboundTransport) => Unit) = new InvokeBuilder(recover, onSuccess, fail, onFatal)
-    def onFatal(fatal: (Throwable, InboundTransport, OutboundTransport) => Unit) = new InvokeBuilder(recover, onSuccess, onFail, fatal)    
+    def withOnSuccess(success: (Option[Command], InboundTransport, OutboundTransport) => Unit) = new InvokeBuilder(recover, success, onFail, onFatal)
+    def withOnFail(fail: (CommandException, InboundTransport, OutboundTransport) => Unit) = new InvokeBuilder(recover, onSuccess, fail, onFatal)
+    def withOnFatal(fatal: (Throwable, InboundTransport, OutboundTransport) => Unit) = new InvokeBuilder(recover, onSuccess, onFail, fatal)
     
     def build(): (Command, InboundTransport, OutboundTransport) => Unit = (cmd: Command, iTr:InboundTransport, oTr: OutboundTransport) => {
       try {
         if (logger.isTraceEnabled)
           logger.trace("Try to execute a command: {}", cmd.asString())
-        cmd.execute.left.flatMap(cmdException => {
+        cmd.execute(iTr, oTr).left.flatMap(cmdException => {
           if (logger.isDebugEnabled)
             logger.debug("Execution of the command fails [command = {}]: {}. Try to recover.", Array(cmd, cmdException))
-          recover(cmdException, iTr, oTr).right.map(Some)
+          recover(cmdException, iTr, oTr).right.flatMap(cmd => Right(Some(cmd)))
         }) match {
           case Left(cmdException) =>
             logger.debug("No any recovery specified for the command exception: {}", cmdException)

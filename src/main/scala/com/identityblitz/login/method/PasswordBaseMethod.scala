@@ -6,7 +6,7 @@ import com.identityblitz.login.cmd.{ChangePswdCmd, BindCommand, Command}
 import com.identityblitz.login.error.CommandException
 import com.identityblitz.login.error.BuiltInErrors._
 import com.identityblitz.login.method.PasswordBaseMethod.FormParams
-import com.identityblitz.login.AuthnMethod
+import com.identityblitz.login.App
 
 /**
  */
@@ -19,9 +19,9 @@ class PasswordBaseMethod(val name: String, val options: Map[String, String]) ext
     throw new IllegalStateException(err)
   })
 
-  private val invoker = InvokeBuilder
+  private val invoker = Invoker
     .withRecover(recover)
-    .onSuccess(onSuccess)
+    .withOnSuccess(onSuccess)
     .build()
 
   protected def recover(cmdException: CommandException, iTr: InboundTransport, oTr: OutboundTransport) = {
@@ -36,7 +36,7 @@ class PasswordBaseMethod(val name: String, val options: Map[String, String]) ext
   }
   
   protected def onSuccess(cmd: Option[Command], iTr: InboundTransport, oTr: OutboundTransport) =
-    cmd.fold(loginFlow.success)(sendCommand(_, pageController))
+    cmd.fold(App.loginFlow.success(name)(iTr, oTr))(sendCommand(_, pageController)(iTr, oTr))
 
 
   override def start(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {

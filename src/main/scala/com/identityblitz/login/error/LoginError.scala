@@ -33,6 +33,8 @@ object BuiltInErrors extends Enumeration {
   val PASSWORD_EXPIRED = BuiltInError("password_expired")
   val WRONG_CURRENT_PASSWORD = BuiltInError("wrong_current_password")
   val INAPPROPRIATE_NEW_PASSWORD = BuiltInError("inappropriate_new_password")
+  val FLOW_NOT_COMPLETED_PROPERLY = BuiltInError("flow_not_completed_properly")
+  val NO_SUBJECT_SESSION_FOUND = BuiltInError("no_subject_session_found")
 
   implicit def valueToBuiltInError(v: Value): BuiltInError = v.asInstanceOf[BuiltInError]
 

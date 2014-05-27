@@ -13,8 +13,8 @@ import play.api.Play.current
 import java.util.regex.Pattern
 import play.api.mvc.SimpleResult
 import scala.util.{Failure, Success, Try}
-import com.identityblitz.login.method.ActiveMethodProvider
 import com.identityblitz.login.App.logger
+import com.identityblitz.login.method.AuthnMethod
 
 /**
  * The Authentication Point (AP) controller is the endpoint for Play applications written on Scala language
@@ -56,8 +56,8 @@ object APController extends Controller {
 
   val loginPath = "/login/"
 
-  val authMethods: Map[String, ActiveMethodProvider] = App.methods.filter(_._2.activeProvider.isDefined).mapValues(_.activeProvider.get)
-  val flowEngine = App.loginFlow.provider
+  val authMethods: Map[String, AuthnMethod] = App.methods
+  val flowEngine = App.loginFlow
 
   /**
    * The entry point action of the AP for request made by HTTP method GET. For this action the specific route

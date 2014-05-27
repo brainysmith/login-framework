@@ -3,8 +3,7 @@ package com.identityblitz.login.glue.servlet;
 import com.identityblitz.login.*;
 import com.identityblitz.login.error.LoginException;
 import com.identityblitz.login.error.TransportException;
-import com.identityblitz.login.provider.WithStart;
-import com.identityblitz.login.method.ActiveMethodProvider;
+import com.identityblitz.login.method.AuthnMethod;
 import com.identityblitz.login.transport.InboundTransport;
 import com.identityblitz.login.transport.OutboundTransport;
 import com.identityblitz.login.transport.RedirectResponse;
@@ -73,10 +72,9 @@ public class APServlet extends HttpServlet {
 
         for(Map.Entry<String, AuthnMethod> entry : WrapAsJava$.MODULE$.mapAsJavaMap(
                 App$.MODULE$.methods()).entrySet()) {
-            if (entry.getValue().activeProvider().isDefined())
-                handlers.put(entry.getKey(), entry.getValue().activeProvider().get());
+            handlers.put(entry.getKey(), entry.getValue());
         }
-        handlers.put("flow", App.loginFlow().provider());
+        handlers.put("flow", App.loginFlow());
     }
 
     @Override
@@ -124,7 +122,7 @@ public class APServlet extends HttpServlet {
 
             try {
                 if ("/do".equalsIgnoreCase(action)) {
-                    ((ActiveMethodProvider)handlers.get(method)).DO(itr, otr);
+                    ((AuthnMethod)handlers.get(method)).DO(itr, otr);
                 } else {
                     handlers.get(method).start(itr, otr);
                 }
