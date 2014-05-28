@@ -4,9 +4,8 @@ import com.identityblitz.login.*;
 import com.identityblitz.login.error.LoginException;
 import com.identityblitz.login.error.TransportException;
 import com.identityblitz.login.method.AuthnMethod;
-import com.identityblitz.login.transport.InboundTransport;
-import com.identityblitz.login.transport.OutboundTransport;
-import com.identityblitz.login.transport.RedirectResponse;
+import com.identityblitz.login.transport.*;
+import com.identityblitz.login.transport.Cookie;
 import com.identityblitz.scs.SCSService;
 import scala.Enumeration;
 import scala.Option;
@@ -14,9 +13,7 @@ import scala.collection.convert.WrapAsJava$;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.*;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -139,6 +136,50 @@ public class APServlet extends HttpServlet {
 
 }
 
+class ServletCookieWrapper implements Cookie {
+
+    private javax.servlet.http.Cookie cookie;
+
+    ServletCookieWrapper(javax.servlet.http.Cookie cookie) {
+        this.cookie = cookie;
+    }
+
+    @Override
+    public String name() {
+        return cookie.getName();
+    }
+
+    @Override
+    public String value() {
+        return cookie.getValue();
+    }
+
+    @Override
+    public Option<Object> maxAge() {
+        return Option.apply((Object)cookie.getMaxAge());
+    }
+
+    @Override
+    public String path() {
+        return cookie.getPath();
+    }
+
+    @Override
+    public Option<String> domain() {
+        return Option.apply(cookie.getDomain());
+    }
+
+    @Override
+    public boolean secure() {
+        return cookie.getSecure();
+    }
+
+    @Override
+    public boolean httpOnly() {
+        return cookie.isHttpOnly();
+    }
+}
+
 class ServletInboundTransport implements InboundTransport {
     private final HttpServletRequest req;
     private final HttpServletResponse resp;
@@ -208,6 +249,16 @@ class ServletInboundTransport implements InboundTransport {
             throw new TransportException(e);
         }
     }
+
+    @Override
+    public Option<? extends Cookie> getCookie(String name) {
+        for(javax.servlet.http.Cookie c: req.getCookies()) {
+            if (c.getName().equals(name)) {
+                return Option.apply(new ServletCookieWrapper(c));
+            }
+        }
+        return Option.empty();
+    }
 }
 
 class ServletOutboundTransport implements OutboundTransport {
@@ -244,4 +295,33 @@ class ServletOutboundTransport implements OutboundTransport {
     public Enumeration.Value platform() {
         return Platform.SERVLET();
     }
+
+    @Override
+    public void addCookie(Cookie cookie) {
+        resp.addCookie(convertCookie(cookie));
+    }
+
+    @Override
+    public void discardCookie(DiscardingCookie cookie) {
+        resp.addCookie(convertCookie(cookie.toCookie()));
+    }
+
+    private javax.servlet.http.Cookie convertCookie(Cookie cookie) {
+        javax.servlet.http.Cookie servletCookie = new javax.servlet.http.Cookie(cookie.name(), cookie.value());
+
+        servletCookie.setPath(cookie.path());
+        servletCookie.setHttpOnly(cookie.httpOnly());
+        servletCookie.setSecure(cookie.secure());
+
+        if (cookie.domain().isDefined()) {
+            servletCookie.setDomain(cookie.domain().get());
+        }
+
+        if (cookie.maxAge().isDefined()) {
+            servletCookie.setMaxAge((Integer)cookie.maxAge().get());
+        }
+
+        return servletCookie;
+    }
+
 }

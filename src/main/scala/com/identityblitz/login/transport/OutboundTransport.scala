@@ -28,4 +28,8 @@ trait OutboundTransport {
    */
   def platform: Platform
 
+  def addCookie(cookie: Cookie)
+
+  def discardCookie(cookie: DiscardingCookie)
+
  }

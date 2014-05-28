@@ -74,5 +74,5 @@ trait InboundTransport {
 
   def removeAttribute(name: String)
 
-  //def getParameterMap: Map[String, Array[String]]
+  def getCookie(name: String): Option[_ <: Cookie]
 }

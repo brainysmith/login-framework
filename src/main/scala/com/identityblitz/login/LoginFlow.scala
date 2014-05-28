@@ -7,8 +7,10 @@ import com.identityblitz.login.error.{BuiltInErrors, LoginError, LoginException}
 import com.identityblitz.login.FlowAttrName._
 import com.identityblitz.login.LoginContext._
 import java.net.URLEncoder
-import com.identityblitz.scs.SCSService
 import com.identityblitz.login.method.AuthnMethod
+import scala.collection.immutable.TreeMap
+import com.identityblitz.login.session.LoginSession
+import com.identityblitz.login.session.LoginSession.LoginSessionBuilder
 
 /**
  * Defines a flow of the login process.
@@ -16,12 +18,6 @@ import com.identityblitz.login.method.AuthnMethod
  */
 @implicitNotFound("No implicit inbound or outbound found.")
 trait LoginFlow extends Handler with WithStart {
-
-  protected lazy val scsService = {
-    val scs = new SCSService()
-    scs.init(false)
-    scs
-  }
 
   private val crackCallbackUrl = (s: String) => {
     val extractor  = """^fwd:(.*)$""".r
@@ -87,7 +83,7 @@ trait LoginFlow extends Handler with WithStart {
    * @param oTr - outbound transport
    */
   final def fail(method: String, cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    logger.trace("An authentication method {} has been completed not successfully. Getting a nex point ...", method)
+    logger.trace("An authentication method '{}' has been completed not successfully. Getting a nex point ...", method)
     onFail(method, cause)
   }
 
@@ -99,15 +95,21 @@ trait LoginFlow extends Handler with WithStart {
    * @param oTr - outbound transport
    */
   final protected def endWithSuccess(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    val cbUrl = iTr.getLoginCtx.get.callbackUri
-    logger.debug("The login flow is completed successfully [lc = {}]. Redirect to the following callback url: {}",
-      iTr.toString, cbUrl)
+    import LoginSession.{getLs, updateLs, lsBuilder, READY}
+    val lc = iTr.getLoginCtx.get
+    if (logger.isDebugEnabled)
+      logger.debug("The login flow is completed successfully [lc = {}].", lc.asString)
 
-    //todo: create session cookie
+    val ls = getLs.fold[LoginSessionBuilder[_, _, READY]](lsBuilder)(ls => lsBuilder(ls))
+      .withClaims(lc.claims)
+      .withMethods(lc.completedMethods: _*)
+      .build()
+    updateLs(ls)
 
+    val cbUrl = lc.callbackUri
     crackCallbackUrl(cbUrl) match {
       case ("forward", u) =>
-        iTr.getLoginCtx.map(lc => iTr.setAttribute(FlowAttrName.LOGIN_CONTEXT, lc.asString))
+        iTr.setAttribute(FlowAttrName.LOGIN_SESSION, ls.asString)
         iTr.forward(u)
       case ("redirect", u) => oTr.redirect(u)
     }
@@ -200,41 +202,44 @@ class DefaultLoginFlow(val options: Map[String, String]) extends LoginFlow {
   }
 
 
-  protected lazy val steps = options.toList.filter(_._1.startsWith("steps"))
+  protected lazy val steps = TreeMap(options.toList.filter(_._1.startsWith("steps"))
     .map(t => t._1.stripPrefix("steps.") -> t._2)
     .map(Step(_))
-    .sortBy(_.n)
-    .toList
+    .map(step => step.n -> step): _*)
 
-  protected lazy val numberOfSteps = steps.length
+  protected lazy val lastStep = steps.last._2
 
-  protected lazy val requiredSteps = steps
+  protected lazy val requiredSteps = steps.values
     .filter(_.methods.exists(mm => mm.flag == MethodFlag.required))
     .map(_.n)
 
-  protected lazy val methodIndex = steps.map(step => {
+  protected lazy val methodIndex = steps.values.map(step => {
     step.methods.map(mm => mm.method.name -> (step -> mm))
   }).flatten.toMap
 
-  protected def isLastStep(step: Step) = step.n == (numberOfSteps - 1)
+  protected def isLastStep(step: Step) = step.n == lastStep.n
 
   protected def completedSteps(implicit iTr: InboundTransport, oTr: OutboundTransport) = iTr.getLoginCtx.get.completedMethods.map(methodIndex(_)._1.n).toSet
 
   protected def flowResult(implicit iTr: InboundTransport, oTr: OutboundTransport) = !requiredSteps.isEmpty && requiredSteps.forall(completedSteps contains)
 
   protected def nextStep(currentStep: Step)(implicit iTr: InboundTransport, oTr: OutboundTransport) {
-    if (isLastStep(currentStep)) {
+    steps.from(currentStep.n).tail.headOption.fold{
+      if (logger.isTraceEnabled)
+        logger.trace("It was the last step: [{}]", currentStep)
       flowResult match {
         case false => endWithError(BuiltInErrors.FLOW_NOT_COMPLETED_PROPERLY)
         case true => endWithSuccess
       }
-    } else {
-      steps(currentStep.n + 1).methods.head.method.start
+    }{case (i, nextStep) =>
+      if (logger.isTraceEnabled)
+        logger.trace("Go to the next step: [{}]", nextStep)
+      nextStep.methods.head.method.start
     }
   }
 
   override protected def onStart(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
-    steps.head.methods.head.method.start
+    steps.head._2.methods.head.method.start
   }
 
   override protected def onFail(method: String, cause: LoginError)

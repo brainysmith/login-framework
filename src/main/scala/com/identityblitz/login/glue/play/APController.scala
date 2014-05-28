@@ -1,20 +1,24 @@
 package com.identityblitz.login.glue.play
 
 import play.api.mvc._
-import scala.concurrent.{Promise, Future}
+import scala.concurrent.{ExecutionContext, Promise, Future}
 import play.api.libs.iteratee.Done
 import com.identityblitz.scs.glue.play.{SCSEnabledAction, SCSRequest}
-import com.identityblitz.login.transport.{RedirectResponse, OutboundTransport, InboundTransport}
+import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.error.TransportException
 import play.api.Play
 import com.identityblitz.login._
 import play.api.mvc.Results._
 import play.api.Play.current
 import java.util.regex.Pattern
-import play.api.mvc.SimpleResult
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 import com.identityblitz.login.App.logger
 import com.identityblitz.login.method.AuthnMethod
+import com.identityblitz.login.transport.RedirectResponse
+import scala.util.Failure
+import play.api.mvc.SimpleResult
+import scala.util.Success
+import play.api.mvc.Cookie
 
 /**
  * The Authentication Point (AP) controller is the endpoint for Play applications written on Scala language
@@ -212,16 +216,21 @@ private class PlayInboundTransport[A](private val req: SCSRequest[A],
 
   private def isForwarded = forwarded
 
+  override def getCookie(name: String): Option[_ <: transport.Cookie] = req.cookies.get(name).map(PlayCookieWrapper)
+
   private def makeOutboundTransport = new OutboundTransport {
-    val resultPromise = Promise[SimpleResult]
+    val resultPromise = Promise[SimpleResult]()
     private val futureResult = resultPromise.future
+
+    private val cookiesToAdd = scala.collection.mutable.Buffer[Cookie]()
+    private val cookiesToDiscard = scala.collection.mutable.Buffer[DiscardingCookie]()
 
     /**
      * Redirect the user agent to the specified location.
      * @param location - location to redirect to.
      * @throws TransportException - if any error occurred while redirecting.
      */
-    def redirect(location: String): Unit = if(self.isAjax) {
+    override def redirect(location: String): Unit = if(self.isAjax) {
       import com.identityblitz.login.glue.play.JUtil._
       resultPromise.success(Ok(new RedirectResponse(location).jObj))
     }
@@ -233,7 +242,7 @@ private class PlayInboundTransport[A](private val req: SCSRequest[A],
      * Returns unwrapped transport.
      * @return - unwrapped transport.
      */
-    def unwrap: AnyRef = {
+    override def unwrap: AnyRef = {
       throw new UnsupportedOperationException("OutboundTransport for Play application does not supported unwrap operation.")
     }
 
@@ -241,14 +250,20 @@ private class PlayInboundTransport[A](private val req: SCSRequest[A],
      * Return the platform of the transport.
      * @return
      */
-    def platform: Platform.Platform = self.platform
+    override def platform: Platform.Platform = self.platform
+
+    override def addCookie(cookie: transport.Cookie): Unit =
+      cookiesToAdd += Cookie(cookie.name, cookie.value, cookie.maxAge, cookie.path, cookie.domain, cookie.secure,
+        cookie.httpOnly)
+
+    override def discardCookie(cookie: transport.DiscardingCookie): Unit =
+      cookiesToDiscard += DiscardingCookie(cookie.name, cookie.path, cookie.domain, cookie.secure)
 
     def result: Future[SimpleResult] = {
       if(!self.isForwarded && !resultPromise.isCompleted)
         resultPromise.success(NotFound)
-      futureResult
+      futureResult.map(_.withCookies(cookiesToAdd: _*).discardingCookies(cookiesToDiscard: _*))(play.api.libs.concurrent.Execution.defaultContext)
     }
-
   }
 
   /**
@@ -275,6 +290,23 @@ private class PlayInboundTransport[A](private val req: SCSRequest[A],
     override def remoteAddress: String = req.remoteAddress
   }
 
+
+
+  private case class PlayCookieWrapper(cookie: Cookie) extends transport.Cookie {
+    override def httpOnly: Boolean = cookie.httpOnly
+
+    override def secure: Boolean = cookie.secure
+
+    override def domain: Option[String] = cookie.domain
+
+    override def path: String = cookie.path
+
+    override def maxAge: Option[Int] = cookie.maxAge
+
+    override def value: String = cookie.value
+
+    override def name: String = cookie.name
+  }
 }
 
 private object PlayInboundTransport {

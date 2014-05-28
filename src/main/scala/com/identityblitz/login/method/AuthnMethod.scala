@@ -2,7 +2,7 @@ package com.identityblitz.login.method
 
 import com.identityblitz.login.provider.{WithBind, Provider}
 import com.identityblitz.login.cmd.{Command, CommandTools}
-import com.identityblitz.login.error.BuiltInErrors
+import com.identityblitz.login.error.{LoginError, BuiltInErrors}
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login._
 import com.identityblitz.login.App._
@@ -39,6 +39,5 @@ trait AuthnMethod extends Handler with WithName with WithStart with WithDo with 
     logger.error(err)
     throw new IllegalArgumentException(err)
   }(Command[Command])
-
 
 }

@@ -18,7 +18,7 @@ object FlowAttrName {
 
   val REDIRECT = "redirect"
 
-  val LOGIN_CONTEXT = "lc"
+  val LOGIN_SESSION = "ls"
 
   val PASSIVE_PROVIDER_ATTR_NAME = "authnPassiveProviders"
 
