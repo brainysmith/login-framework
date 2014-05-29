@@ -1,7 +1,7 @@
 package com.identityblitz.login.session
 
 import com.identityblitz.json._
-import com.identityblitz.login.transport.{CookieScala, OutboundTransport, InboundTransport}
+import com.identityblitz.login.transport.{DiscardingCookieScala, CookieScala, OutboundTransport, InboundTransport}
 import com.identityblitz.login.App.{logger, sessionConf}
 import com.identityblitz.scs.SCSService
 
@@ -84,6 +84,11 @@ object LoginSession {
     val encLs = scsService.encode(ls.asString).asString()
     oTr.addCookie(CookieScala(sessionConf.cookieName, encLs, None, sessionConf.path, sessionConf.domain,
       sessionConf.secure, sessionConf.httpOnly))
+  }
+
+  def removeLs(implicit iTr: InboundTransport, oTr: OutboundTransport) {
+    logger.trace("Removing the current login session")
+    oTr.discardCookie(DiscardingCookieScala(sessionConf.cookieName, sessionConf.path, sessionConf.domain,sessionConf.secure))
   }
 
 

@@ -18,7 +18,9 @@ object App {
 
   lazy val methods: Map[String, AuthnMethod] = confService.getDeepMapString("authn-methods").map(t => t._1 -> Handler(t))
 
-  lazy val loginFlow = LoginFlow(confService.getMapString("flow"))
+  lazy val loginFlow = LoginFlow(confService.getMapString("login-flow"))
+
+  lazy val logoutFlow = LogoutFlow(confService.getMapString("logout-flow"))
 
   lazy val sessionConf = LoginSessionConf(confService.getOptString("session.cookie.name").getOrElse("bs"),
     confService.getOptLong("session.ttl").getOrElse(1800000),

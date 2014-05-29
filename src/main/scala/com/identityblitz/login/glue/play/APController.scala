@@ -61,7 +61,8 @@ object APController extends Controller {
   val loginPath = "/login/"
 
   val authMethods: Map[String, AuthnMethod] = App.methods
-  val flowEngine = App.loginFlow
+  val loginFlow = App.loginFlow
+  val logoutFlow = App.logoutFlow
 
   /**
    * The entry point action of the AP for request made by HTTP method GET. For this action the specific route
@@ -113,14 +114,20 @@ object APController extends Controller {
   private def invokeHandler(handler: String, directCall: Boolean)(implicit itr: InboundTransport, otr: OutboundTransport): Try[Unit] = {
     Try[Unit] {
       Call(handler, directCall) match {
-        case Call("flow", null, true) => flowEngine.start
+        case Call("flow", null, true) => loginFlow.start
         case Call("flow", null, false) =>
           itr.setAttribute(FlowAttrName.CALLBACK_URI_NAME, itr.getParameter(FlowAttrName.CALLBACK_URI_NAME).fold[String]{
             logger.error("callback_uri is not specified.")
             throw new IllegalArgumentException("callback_uri is not specified.")
           }(s => s))
           itr.getParameter(FlowAttrName.AUTHN_METHOD_NAME).foreach(itr.setAttribute(FlowAttrName.AUTHN_METHOD_NAME, _))
-          flowEngine.start
+          loginFlow.start
+        case Call("logout", null, false) =>
+          itr.setAttribute(FlowAttrName.CALLBACK_URI_NAME, itr.getParameter(FlowAttrName.CALLBACK_URI_NAME).fold[String]{
+            logger.error("callback_uri is not specified.")
+            throw new IllegalArgumentException("callback_uri is not specified.")
+          }(s => s))
+          logoutFlow.start
         case Call(m, "/do", _) => authMethods(m).DO
         case c @ Call(_, _, _) =>
           logger.error("Got a wrong call: {}.", c)

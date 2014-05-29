@@ -17,15 +17,7 @@ import com.identityblitz.login.session.LoginSession.LoginSessionBuilder
  * The implementation must be a singleton.
  */
 @implicitNotFound("No implicit inbound or outbound found.")
-trait LoginFlow extends Handler with WithStart {
-
-  private val crackCallbackUrl = (s: String) => {
-    val extractor  = """^fwd:(.*)$""".r
-    extractor findFirstIn s match {
-      case Some(extractor(url)) => ("forward", url)
-      case _ => ("redirect", s)
-    }
-  }
+trait LoginFlow extends Handler with WithStart with FlowTools {
 
   /**
    * Starts a new authentication method. If login context (LC) is not found it will be created.
@@ -89,7 +81,7 @@ trait LoginFlow extends Handler with WithStart {
 
 
   /**
-   * Completes the login flow and redirect to callback uri with successfully result.
+   * Completes the login flow and returns to callback uri with successfully result.
    *
    * @param iTr - inbound transport
    * @param oTr - outbound transport
