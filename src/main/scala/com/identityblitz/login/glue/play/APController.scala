@@ -1,7 +1,7 @@
 package com.identityblitz.login.glue.play
 
 import play.api.mvc._
-import scala.concurrent.{ExecutionContext, Promise, Future}
+import scala.concurrent.{Promise, Future}
 import play.api.libs.iteratee.Done
 import com.identityblitz.scs.glue.play.{SCSEnabledAction, SCSRequest}
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
