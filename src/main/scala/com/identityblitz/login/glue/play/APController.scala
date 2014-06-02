@@ -122,6 +122,7 @@ object APController extends Controller {
           }(s => s))
           itr.getParameter(FlowAttrName.AUTHN_METHOD_NAME).foreach(itr.setAttribute(FlowAttrName.AUTHN_METHOD_NAME, _))
           loginFlow.start
+        case Call("logout", null, true) => logoutFlow.start
         case Call("logout", null, false) =>
           itr.setAttribute(FlowAttrName.CALLBACK_URI_NAME, itr.getParameter(FlowAttrName.CALLBACK_URI_NAME).fold[String]{
             logger.error("callback_uri is not specified.")
