@@ -9,7 +9,7 @@ version := "0.1.2"
 
 licenses := Seq("MIT License" -> url("http://www.opensource.org/licenses/mit-license.php"))
 
-homepage := Some(url("https://github.com/brainysmith/conf-lib"))
+homepage := Some(url("https://github.com/brainysmith/login-framework"))
 
 scalaVersion := "2.10.3"
 
