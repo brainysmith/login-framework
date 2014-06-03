@@ -214,7 +214,7 @@ private class PlayInboundTransport[A](private val req: SCSRequest[A],
 
   override def getLoginCtx: Option[LoginContext] = req.getSCS.map(s => LoginContext.fromString(s))
 
-  override def updatedLoginCtx(loginCtx: LoginContext): Unit = { req.changeSCS(Option(loginCtx).map(_.asString)) }
+  override def updatedLoginCtx(loginCtx: Option[LoginContext]): Unit = { req.changeSCS(loginCtx.map(_.asString)) }
 
   override def getAttribute(name: String): Option[String] = attributes.get(name)
 

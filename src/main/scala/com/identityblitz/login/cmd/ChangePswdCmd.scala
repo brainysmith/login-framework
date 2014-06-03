@@ -5,7 +5,7 @@ import com.identityblitz.json._
 import com.identityblitz.login.error.CommandException
 import com.identityblitz.login.error.BuiltInErrors._
 import com.identityblitz.login.App.logger
-import com.identityblitz.login.{LoginContext, App}
+import com.identityblitz.login.App
 import com.identityblitz.login.provider.WithChangePassword
 
 
@@ -45,8 +45,11 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
         provider.changePswd(userId, curPswd, newPswd)
           .left.map(CommandException(this, _))
           .right.map{ case (claims, cmd) =>
-            iTr.updatedLoginCtx(iTr.getLoginCtx.fold[LoginContext]{
-              throw new IllegalStateException("Login context not found.")}(_ addClaims claims))
+            iTr.updatedLoginCtx(iTr.getLoginCtx.map(_ addClaims claims).orElse({
+              val err = "Login context not found."
+              logger.error(err)
+              throw new IllegalStateException(err)
+            }))
             cmd
         }
       case _ =>

@@ -40,10 +40,10 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
     iTr.updatedLoginCtx(iTr.getAttribute(CALLBACK_URI_NAME).map(cb => {
       lcBuilder.withCallbackUri(cb)
         .build()
-    }).fold[LoginContext]{
+    }).fold[Option[LoginContext]]{
       logger.error("Parameter {} not found in the inbound transport", CALLBACK_URI_NAME)
       throw new LoginException(s"Parameter $CALLBACK_URI_NAME not found in the inbound transport")
-    }(lc => lc))
+    }(lc => Some(lc)))
 
     onStart
   }
@@ -57,16 +57,17 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
    * @param oTr - outbound transport
    */
   final def success(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    val lc = iTr.getLoginCtx.get
     logger.trace("An authentication method {} has been completed successfully. Getting a nex point ...", method)
-    iTr.updatedLoginCtx(iTr.getLoginCtx.fold[LoginContext]{
-      throw new IllegalStateException("Login context not found.")
-    }(_ addMethod method))
+    iTr.updatedLoginCtx(iTr.getLoginCtx.map(_ addMethod method).orElse({
+      val err = "Login context not found."
+      logger.error(err)
+      throw new IllegalStateException(err)
+    }))
     onSuccess(method)
   }
 
   /**
-   * Successfully completes the current authentication method and call the method [[onFail]] to define the next point
+   * Not successfully completes the current authentication method and call the method [[onFail]] to define the next point
    * of the login flow.
    *
    * @param method - not successfully completed authentication method
@@ -92,12 +93,17 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
     if (logger.isDebugEnabled)
       logger.debug("The login flow is completed successfully [lc = {}].", lc.asString)
 
+    /** create a login session **/
     val ls = getLs.fold[LoginSessionBuilder[_, _, READY]](lsBuilder)(ls => lsBuilder(ls))
       .withClaims(lc.claims)
       .withMethods(lc.completedMethods: _*)
       .build()
     updateLs(ls)
 
+    /** remove the current login context **/
+    iTr.updatedLoginCtx(None)
+
+    /** call back **/
     val cbUrl = lc.callbackUri
     crackCallbackUrl(cbUrl) match {
       case ("forward", u) =>
@@ -117,6 +123,10 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
   final protected def endWithError(cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     val callbackUri = iTr.getLoginCtx.get.callbackUri
     logger.debug("The login flow complete with error [{}] redirect to the following location: {}", cause, callbackUri)
+
+    /** remove the current login context **/
+    iTr.updatedLoginCtx(None)
+
     crackCallbackUrl(callbackUri) match {
       case ("forward", u) =>
         iTr.setAttribute("error", cause.name)

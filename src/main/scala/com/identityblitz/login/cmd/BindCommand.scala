@@ -3,7 +3,7 @@ package com.identityblitz.login.cmd
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json._
 import com.identityblitz.login.App.logger
-import com.identityblitz.login.{LoginContext, App}
+import com.identityblitz.login.App
 import com.identityblitz.login.error.{CustomLoginError, LoginError, CommandException}
 import com.identityblitz.login.provider.{WithBind, Provider}
 
@@ -62,8 +62,11 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
     }
 
     doBind(bindProviders, data).right.map( t => {
-      itr.updatedLoginCtx(itr.getLoginCtx.fold[LoginContext]{
-        throw new IllegalStateException("Login context not found.")}(_ addClaims t._1))
+      itr.updatedLoginCtx(itr.getLoginCtx.map(_ addClaims t._1).orElse({
+        val err = "Login context not found."
+        logger.error(err)
+        throw new IllegalStateException(err)
+      }))
       t._2
     }).left.map(e => {
       if(logger.isDebugEnabled)

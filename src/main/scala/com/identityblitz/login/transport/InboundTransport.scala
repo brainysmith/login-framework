@@ -56,7 +56,7 @@ trait InboundTransport {
    * then inserts the specified context.
    * @param loginCtx
    */
-  def updatedLoginCtx(loginCtx: LoginContext)
+  def updatedLoginCtx(loginCtx: Option[LoginContext])
 
   /**
    * Returns the attribute value corresponding to the specified name or [[scala.None]]] - if the attribute is absent.

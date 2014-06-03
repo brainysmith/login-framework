@@ -218,8 +218,8 @@ class ServletInboundTransport implements InboundTransport {
     }
 
     @Override
-    public void updatedLoginCtx(LoginContext loginCtx) {
-        SCSService.changeSCS(req, loginCtx.asString());
+    public void updatedLoginCtx(Option<LoginContext> loginCtx) {
+        SCSService.changeSCS(req, loginCtx.isDefined()? loginCtx.get().asString() : null);
     }
 
     @Override
