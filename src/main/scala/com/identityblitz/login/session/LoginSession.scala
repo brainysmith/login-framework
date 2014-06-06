@@ -1,9 +1,17 @@
 package com.identityblitz.login.session
 
 import com.identityblitz.json._
-import com.identityblitz.login.transport.{DiscardingCookieScala, CookieScala, OutboundTransport, InboundTransport}
+import com.identityblitz.login.transport._
 import com.identityblitz.login.App.{logger, sessionConf}
 import com.identityblitz.scs.SCSService
+import scala.util.{Success, Failure, Try}
+import com.identityblitz.scs.error.SCSExpiredException
+import scala.util.Failure
+import scala.Some
+import com.identityblitz.login.transport.CookieScala
+import scala.util.Success
+import com.identityblitz.login.transport.DiscardingCookieScala
+import com.identityblitz.json.JSuccess
 
 /**
   */
@@ -39,7 +47,7 @@ object LoginSession {
 
   protected lazy val scsService = {
     val scs = new SCSService()
-    scs.init(false)
+    scs.init(false, sessionConf.ttl)
     scs
   }
   
@@ -69,10 +77,21 @@ object LoginSession {
   }
 
   def getLs(implicit iTr: InboundTransport, oTr: OutboundTransport) = iTr.getCookie(sessionConf.cookieName)
-    .map(sc => scsService.decode(sc.value).getData)
-    .map(fromString)
+    .orElse[Cookie]{
+    if (logger.isDebugEnabled)
+      logger.debug("A session cookie [{}] not found,", sessionConf.cookieName)
+    None
+   }.flatMap(sc => Try(scsService.decode(sc.value)) match {
+    case Failure(e:SCSExpiredException) =>
+      logger.debug("The session cookie is expired: {}", e)
+      None
+    case Failure(e) =>
+      logger.error("Can't decode the session cookie: {}", e)
+      None
+    case Success(v) => Some(v.getData)
+  }).map(fromString)
     .filter(ls => {
-    val isExpired = (ls.createdOn + sessionConf.ttl) > System.currentTimeMillis()
+    val isExpired = (ls.createdOn + sessionConf.ttl*1000) > System.currentTimeMillis()
     if (logger.isTraceEnabled)
       logger.trace("A result of the login session's [{}] expiration check: {}", ls.asString, isExpired)
     isExpired
