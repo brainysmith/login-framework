@@ -12,7 +12,7 @@ import play.api.mvc.Results._
 import play.api.Play.current
 import java.util.regex.Pattern
 import scala.util.Try
-import com.identityblitz.login.App.logger
+import com.identityblitz.login.LoginFramework.logger
 import com.identityblitz.login.method.AuthnMethod
 import com.identityblitz.login.transport.RedirectResponse
 import scala.util.Failure
@@ -60,9 +60,9 @@ object APController extends Controller {
 
   val loginPath = "/login/"
 
-  val authMethods: Map[String, AuthnMethod] = App.methods
-  val loginFlow = App.loginFlow
-  val logoutFlow = App.logoutFlow
+  val authMethods: Map[String, AuthnMethod] = LoginFramework.methods
+  val loginFlow = LoginFramework.loginFlow
+  val logoutFlow = LoginFramework.logoutFlow
 
   /**
    * The entry point action of the AP for request made by HTTP method GET. For this action the specific route

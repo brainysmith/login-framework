@@ -2,7 +2,7 @@ package com.identityblitz.login.glue.play
 
 import scala.Some
 import com.identityblitz.login.{RelyingParty, FlowAttrName}
-import com.identityblitz.login.App.logger
+import com.identityblitz.login.LoginFramework.logger
 
 trait LoginRequest {
 

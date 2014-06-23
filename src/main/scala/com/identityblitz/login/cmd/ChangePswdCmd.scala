@@ -4,8 +4,8 @@ import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json._
 import com.identityblitz.login.error.CommandException
 import com.identityblitz.login.error.BuiltInErrors._
-import com.identityblitz.login.App.logger
-import com.identityblitz.login.App
+import com.identityblitz.login.LoginFramework.logger
+import com.identityblitz.login.LoginFramework
 import com.identityblitz.login.provider.WithChangePassword
 
 
@@ -27,7 +27,7 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
     err    
   })
 
-  lazy val provider = App.providers.get(providerName)
+  lazy val provider = LoginFramework.providers.get(providerName)
     .filter(p => classOf[WithChangePassword].isAssignableFrom(p.getClass))
     .map(_.asInstanceOf[WithChangePassword]).getOrElse({
     val err = s"Provider with specified name '$providerName' is not configured."

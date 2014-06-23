@@ -2,7 +2,7 @@ package com.identityblitz.login.glue.play
 
 import play.api.mvc.Request
 import com.identityblitz.login.FlowAttrName._
-import com.identityblitz.login.App.logger
+import com.identityblitz.login.LoginFramework.logger
 import com.identityblitz.login.transport.{JsonResponse, RedirectResponse, CommandResponse}
 import scala.Some
 

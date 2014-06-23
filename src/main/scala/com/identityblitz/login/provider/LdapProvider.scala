@@ -1,6 +1,6 @@
 package com.identityblitz.login.provider
 
-import com.identityblitz.login.App.logger
+import com.identityblitz.login.LoginFramework.logger
 import com.unboundid.ldap.sdk._
 import com.unboundid.util.ssl.{TrustAllTrustManager, SSLUtil}
 import scala.collection
@@ -158,7 +158,7 @@ class LdapBindProvider(val name:String, val options: Map[String, String]) extend
   }
 
   protected def _bind(userDn: String, pswd: String)(implicit connection: LDAPConnection): Either[LoginError, BindResult] = {
-    Try[BindResult](connection.bind(new SimpleBindRequest(userDn, pswd))).map[BindResult](bindRes => {
+    Try[BindResult](connection.bind(new SimpleBindRequest(userDn, pswd).setResponseTimeoutMillis())).map[BindResult](bindRes => {
       if (!bindRes.getResultCode.isConnectionUsable) {
         logger.error("Can't bind to '{}' LDAP server: the connection isn't usable [userDn = {}, resultCode = {}, " +
           "messageId = {}, diagnosticMessage = {}]",

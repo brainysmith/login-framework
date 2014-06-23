@@ -1,12 +1,12 @@
 package com.identityblitz.login.method
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
-import com.identityblitz.login.App.logger
+import com.identityblitz.login.LoginFramework.logger
 import com.identityblitz.login.cmd.{ChangePswdCmd, BindCommand, Command}
 import com.identityblitz.login.error.CommandException
 import com.identityblitz.login.error.BuiltInErrors._
 import com.identityblitz.login.method.PasswordBaseMethod.FormParams
-import com.identityblitz.login.App
+import com.identityblitz.login.LoginFramework
 
 /**
  */
@@ -36,7 +36,7 @@ class PasswordBaseMethod(val name: String, val options: Map[String, String]) ext
   }
   
   protected def onSuccess(cmd: Option[Command], iTr: InboundTransport, oTr: OutboundTransport) =
-    cmd.fold(App.loginFlow.success(name)(iTr, oTr))(sendCommand(_, pageController)(iTr, oTr))
+    cmd.fold(LoginFramework.loginFlow.success(name)(iTr, oTr))(sendCommand(_, pageController)(iTr, oTr))
 
 
   override def start(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {

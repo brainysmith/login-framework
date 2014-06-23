@@ -1,6 +1,6 @@
 package com.identityblitz.login.glue.play
 
-import com.identityblitz.login.App.logger
+import com.identityblitz.login.LoginFramework.logger
 import com.identityblitz.login.FlowAttrName
 
 /**

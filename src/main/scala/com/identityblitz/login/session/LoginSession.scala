@@ -2,14 +2,10 @@ package com.identityblitz.login.session
 
 import com.identityblitz.json._
 import com.identityblitz.login.transport._
-import com.identityblitz.login.App.{logger, sessionConf}
+import com.identityblitz.login.LoginFramework.{logger, sessionConf}
 import com.identityblitz.scs.SCSService
-import scala.util.{Success, Failure, Try}
-import com.identityblitz.scs.error.SCSExpiredException
-import scala.util.Failure
-import scala.Some
+import scala.util.Try
 import com.identityblitz.login.transport.CookieScala
-import scala.util.Success
 import com.identityblitz.login.transport.DiscardingCookieScala
 import com.identityblitz.json.JSuccess
 
@@ -47,17 +43,17 @@ object LoginSession {
 
   protected lazy val scsService = {
     val scs = new SCSService()
-    scs.init(false, sessionConf.ttl)
+    scs.init(false, sessionConf.sInactivityPeriod)
     scs
   }
-  
-  
-  implicit def jwriter: JWriter[LoginSession] = new JWriter[LoginSession] {       
+
+
+  implicit def jwriter: JWriter[LoginSession] = new JWriter[LoginSession] {
     def write(o: LoginSession): JVal = Json.obj(
       "completedMethods" -> JArr(o.completedMethods.toIterable.map(JStr(_)).toArray),
       "claims" -> o.claims,
       "createdOn" -> JNum(o.createdOn)
-    )    
+    )
   }
 
   implicit def jreader: JReader[LoginSession] = new JReader[LoginSession] {
@@ -76,26 +72,19 @@ object LoginSession {
     }
   }
 
-  def getLs(implicit iTr: InboundTransport, oTr: OutboundTransport) = iTr.getCookie(sessionConf.cookieName)
-    .orElse[Cookie]{
+  def getLs(implicit iTr: InboundTransport, oTr: OutboundTransport) = iTr.getCookie(sessionConf.cookieName).orElse[Cookie]({
     if (logger.isDebugEnabled)
-      logger.debug("A session cookie [{}] not found,", sessionConf.cookieName)
+      logger.debug("A session cookie with name '{}' not found,", sessionConf.cookieName)
     None
-   }.flatMap(sc => Try(scsService.decode(sc.value)) match {
-    case Failure(e:SCSExpiredException) =>
-      logger.debug("The session cookie is expired: {}", e)
-      None
-    case Failure(e) =>
-      logger.error("Can't decode the session cookie: {}", e)
-      None
-    case Success(v) => Some(v.getData)
-  }).map(fromString)
-    .filter(ls => {
-    val isExpired = (ls.createdOn + sessionConf.ttl*1000) > System.currentTimeMillis()
-    if (logger.isTraceEnabled)
-      logger.trace("A result of the login session's [{}] expiration check: {}", ls.asString, isExpired)
-    isExpired
-  })
+  }).flatMap(sc => Try(scsService.decode(sc.value).getData).map(fromString).toOption)
+    .filter(
+      ls => {
+        val isExpired = (ls.createdOn + sessionConf.ttl) < System.currentTimeMillis()
+        if (logger.isTraceEnabled)
+          logger.trace("Is the login session's ttl [{}] has been expired: {}", ls.asString, isExpired)
+        !isExpired
+      }
+    )
 
   def updateLs(ls: LoginSession)(implicit iTr: InboundTransport, oTr: OutboundTransport) {
     if (logger.isTraceEnabled)
@@ -112,7 +101,7 @@ object LoginSession {
 
 
   private def fromString(str: String) :LoginSession = Json.fromJson[LoginSession](JVal.parseStr(str))
-  
+
   abstract class READY
   abstract class NOT_READY
 
@@ -134,4 +123,5 @@ object LoginSession {
 
 case class LoginSessionImpl(completedMethods: Set[String], claims: JObj, createdOn: Long) extends LoginSession
 
-case class LoginSessionConf(cookieName: String, ttl: Long, path: String, domain: Option[String], secure: Boolean, httpOnly: Boolean)
+case class LoginSessionConf(cookieName: String, ttl: Long, path: String, domain: Option[String], secure: Boolean,
+                            httpOnly: Boolean, sInactivityPeriod: Long)

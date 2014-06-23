@@ -1,7 +1,7 @@
 package com.identityblitz.login
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
-import com.identityblitz.login.App._
+import com.identityblitz.login.LoginFramework._
 import com.identityblitz.login.FlowAttrName._
 import com.identityblitz.login.error.LoginException
 import com.identityblitz.login.session.LoginSession.removeLs

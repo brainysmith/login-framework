@@ -1,7 +1,7 @@
 package com.identityblitz.login
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
-import com.identityblitz.login.App.logger
+import com.identityblitz.login.LoginFramework.logger
 import scala.annotation.implicitNotFound
 import com.identityblitz.login.error.{BuiltInErrors, LoginError, LoginException}
 import com.identityblitz.login.FlowAttrName._
@@ -189,7 +189,7 @@ class DefaultLoginFlow(val options: Map[String, String]) extends LoginFlow {
   protected object MethodMeta {
     def apply(raw: String): MethodMeta = {
       val parts = raw.split(":").map(_.trim).filter(!_.isEmpty)
-      val m = App.methods(parts(0))
+      val m = LoginFramework.methods(parts(0))
       val f = if (parts.length > 1) MethodFlag.withName(parts(1)) else MethodFlag.required
       MethodMeta(m, f)
     }

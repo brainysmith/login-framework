@@ -2,8 +2,8 @@ package com.identityblitz.login.cmd
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json._
-import com.identityblitz.login.App.logger
-import com.identityblitz.login.App
+import com.identityblitz.login.LoginFramework.logger
+import com.identityblitz.login.LoginFramework
 import com.identityblitz.login.error.{CustomLoginError, LoginError, CommandException}
 import com.identityblitz.login.provider.{WithBind, Provider}
 
@@ -26,7 +26,7 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
     err
   })
 
-  lazy val bindProviders = App.methods(methodName).bindProviders.ensuring(!_.isEmpty, {
+  lazy val bindProviders = LoginFramework.methods(methodName).bindProviders.ensuring(!_.isEmpty, {
     val err = s"No bind provider found [authentication method = $methodName]. Check the configuration."
     logger.error(err)
     throw new IllegalStateException(err)

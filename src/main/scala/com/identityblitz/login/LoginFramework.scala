@@ -9,7 +9,7 @@ import com.identityblitz.login.session.LoginSessionConf
 
 /**
  */
-object App {
+object LoginFramework {
   import ServiceProvider.confService
 
   val logger = LoggerFactory.getLogger("com.identityblitz.login-framework")
@@ -23,11 +23,12 @@ object App {
   lazy val logoutFlow = LogoutFlow(confService.getMapString("logout-flow"))
 
   lazy val sessionConf = LoginSessionConf(confService.getOptString("session.cookie.name").getOrElse("bs"),
-    confService.getOptLong("session.ttl").getOrElse(1800000),
+    confService.getOptLong("session.ttl").getOrElse(1800L) * 1000L,
     confService.getOptString("session.cookie.path").getOrElse("/"),
     confService.getOptString("session.cookie.domain"),
     confService.getOptBoolean("session.cookie.secure").getOrElse(true),
-    confService.getOptBoolean("session.cookie.httpOnly").getOrElse(true)
+    confService.getOptBoolean("session.cookie.httpOnly").getOrElse(true),
+    confService.getOptLong("session.inactive-period").getOrElse(1800L)
   )
 
   def findProvider[A](name: Option[String], classes: Class[_]*) = name.flatMap(providers.get)

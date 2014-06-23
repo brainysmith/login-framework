@@ -5,26 +5,28 @@ import com.identityblitz.login.cmd.{Command, CommandTools}
 import com.identityblitz.login.error.{LoginError, BuiltInErrors}
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login._
-import com.identityblitz.login.App._
+import com.identityblitz.login.LoginFramework._
 import scala.Some
 
 
 /**
- */
+  */
 trait AuthnMethod extends Handler with WithName with WithStart with WithDo with CommandTools {
 
   lazy val bindProviders =  options.get("bind-providers").map(_.split(","))
     .getOrElse[Array[String]](Array.empty)
-    .flatMap(pName => App.findProvider[Provider with WithBind](Some(pName), classOf[Provider], classOf[WithBind]))
+    .flatMap(pName => LoginFramework.findProvider[Provider with WithBind](Some(pName), classOf[Provider], classOf[WithBind]))
 
   protected def Invoker: InvokeBuilder = new InvokeBuilder()
-    .withOnFatal((e, iTr, oTr) => {
-    loginFlow.fail(name, BuiltInErrors.INTERNAL)(iTr, oTr)
-  })
-    .withOnFail((cmdException, iTr, oTr) => {
-    iTr.setAttribute(FlowAttrName.ERROR, cmdException.error.name)
-    loginFlow.fail(name, cmdException.error)(iTr, oTr)
-  })
+    .withOnFatal(
+      (e, iTr, oTr) => {
+        loginFlow.fail(name, BuiltInErrors.INTERNAL)(iTr, oTr)
+      }
+    ).withOnFail(
+      (cmdException, iTr, oTr) => {
+        loginFlow.fail(name, cmdException.error)(iTr, oTr)
+      }
+    )
 
 
   protected def sendCommand(cmd: Command, path: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {

@@ -2,7 +2,7 @@ package com.identityblitz.login.method
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.error.{BuiltInErrors, LoginException}
-import com.identityblitz.login.App.loginFlow
+import com.identityblitz.login.LoginFramework.loginFlow
 import com.identityblitz.login.session.LoginSession.getLs
 
 /**

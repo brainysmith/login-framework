@@ -3,7 +3,7 @@ package com.identityblitz.login
 import com.identityblitz.login.error.LoginException
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.util.Reflection
-import com.identityblitz.login.App._
+import com.identityblitz.login.LoginFramework._
 
 /**
   */

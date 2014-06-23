@@ -2,7 +2,7 @@ package com.identityblitz.login.cmd
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json.{Json, JVal}
-import com.identityblitz.login.App.logger
+import com.identityblitz.login.LoginFramework.logger
 import com.identityblitz.login.error.CommandException
 import com.identityblitz.login.util.Base64Util._
 

@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.identityblitz.login.App.logger;
+import static com.identityblitz.login.LoginFramework.logger;
 
 /**
  * The Authentication Point (AP) servlet is the endpoint for Java Servlet based application
@@ -65,13 +65,13 @@ public class APServlet extends HttpServlet {
 
     @Override
     public void init() throws ServletException {
-        handlers = new HashMap<String, WithStart>(App$.MODULE$.methods().size() + 1);
+        handlers = new HashMap<String, WithStart>(LoginFramework$.MODULE$.methods().size() + 1);
 
         for(Map.Entry<String, AuthnMethod> entry : WrapAsJava$.MODULE$.mapAsJavaMap(
-                App$.MODULE$.methods()).entrySet()) {
+                LoginFramework$.MODULE$.methods()).entrySet()) {
             handlers.put(entry.getKey(), entry.getValue());
         }
-        handlers.put("flow", App.loginFlow());
+        handlers.put("flow", LoginFramework.loginFlow());
     }
 
     @Override

@@ -2,8 +2,9 @@ package com.identityblitz.login.cmd
 
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.error.{BuiltInErrors, CommandException}
-import com.identityblitz.login.App._
+import com.identityblitz.login.LoginFramework._
 import scala.util.control.NonFatal
+import com.identityblitz.login.FlowAttrName
 
 /**
  */
@@ -27,18 +28,20 @@ trait CommandTools {
         cmd.execute(iTr, oTr).left.flatMap(cmdException => {
           if (logger.isDebugEnabled)
             logger.debug("Execution of the command fails [command = {}]: {}. Try to recover.", Array(cmd, cmdException))
+          iTr.setAttribute(FlowAttrName.ERROR, cmdException.error.name)
           recover(cmdException, iTr, oTr).right.flatMap(cmd => Right(Some(cmd)))
         }) match {
           case Left(cmdException) =>
             logger.debug("No any recovery specified for the command exception: {}", cmdException)
             onFail(cmdException, iTr, oTr)
           case Right(res) =>
-            logger.debug("Execution of the command is completed successfully. Getting command: {}", res)
+            logger.debug("Execution of the command is completed successfully or the command was recovered. Getting command: {}", res)
             onSuccess(res, iTr, oTr)
         }
       } catch {
         case NonFatal(e) =>
           logger.error("During executing command an internal error has occurred: {}. ", e)
+          iTr.setAttribute(FlowAttrName.ERROR, BuiltInErrors.INTERNAL.name)
           onFatal(e, iTr, oTr)
           Left(CommandException(cmd, BuiltInErrors.INTERNAL))
       }      

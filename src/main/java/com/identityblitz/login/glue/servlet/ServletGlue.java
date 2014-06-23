@@ -6,7 +6,7 @@ import com.identityblitz.login.transport.JsonResponse;
 import com.identityblitz.login.transport.RedirectResponse;
 import scala.Option;
 
-import static com.identityblitz.login.App.logger;
+import static com.identityblitz.login.LoginFramework.logger;
 import javax.servlet.http.HttpServletRequest;
 
 /**
