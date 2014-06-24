@@ -38,6 +38,8 @@ class LdapBindProvider(val name:String, val options: Map[String, String]) extend
       throw new IllegalArgumentException(errors mkString ", ")
   }
 
+  private val connectTimeout = confMap("connect-timeout").asInstanceOf[Int]
+  private val responseTimeout = confMap("response-timeout").asInstanceOf[Long]
   private val userDnPtn = confMap("userDn").asInstanceOf[String]
 
   private val pool = {
@@ -45,6 +47,9 @@ class LdapBindProvider(val name:String, val options: Map[String, String]) extend
     val port = confMap("port").asInstanceOf[Int]
     val connectionOption = new LDAPConnectionOptions()
     connectionOption.setAutoReconnect(confMap("autoReconnect").asInstanceOf[Boolean])
+    connectionOption.setConnectTimeoutMillis(connectTimeout)
+    connectionOption.setResponseTimeoutMillis(responseTimeout)
+
 
     val connection: LDAPConnection = confMap("useSSL").asInstanceOf[Boolean] match {
       case true =>
@@ -158,7 +163,7 @@ class LdapBindProvider(val name:String, val options: Map[String, String]) extend
   }
 
   protected def _bind(userDn: String, pswd: String)(implicit connection: LDAPConnection): Either[LoginError, BindResult] = {
-    Try[BindResult](connection.bind(new SimpleBindRequest(userDn, pswd).setResponseTimeoutMillis())).map[BindResult](bindRes => {
+    Try[BindResult](connection.bind(new SimpleBindRequest(userDn, pswd))).map[BindResult](bindRes => {
       if (!bindRes.getResultCode.isConnectionUsable) {
         logger.error("Can't bind to '{}' LDAP server: the connection isn't usable [userDn = {}, resultCode = {}, " +
           "messageId = {}, diagnosticMessage = {}]",
@@ -232,7 +237,9 @@ private object LdapBindProvider {
     rOrL(_)("autoReconnect", Right(true), str => str.toBoolean),
     rOrL(_)("useSSL", Right(true), str => str.toBoolean),
     rOrL(_)("initialConnections", Right(1), str => str.toInt),
-    rOrL(_)("maxConnections", Right(5), str => str.toInt)
+    rOrL(_)("maxConnections", Right(5), str => str.toInt),
+    rOrL(_)("connect-timeout", Right(3000), str => str.toInt),
+    rOrL(_)("response-timeout", Right(3000L), str => str.toLong)
   )
 
   val errorMapper = Map(ResultCode.INVALID_CREDENTIALS -> INVALID_CREDENTIALS,
