@@ -17,6 +17,7 @@ trait LoginRequest {
   def toMap = {
     val mMap = scala.collection.mutable.HashMap[String, String](FlowAttrName.CALLBACK_URI_NAME -> this.cb)
     this.am.foreach(method => mMap += (FlowAttrName.AUTHN_METHOD_NAME -> method))
+    mMap += (FlowAttrName.RELYING_PARTY -> rp.asString())
     mMap.toMap
   }
 

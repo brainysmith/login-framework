@@ -20,6 +20,8 @@ object FlowAttrName {
 
   val LOGIN_SESSION = "ls"
 
+  val RELYING_PARTY = "rp"
+
   val PASSIVE_PROVIDER_ATTR_NAME = "authnPassiveProviders"
 
   lazy val set = getClass.getDeclaredMethods.filter(_.getReturnType == classOf[String]).map(_.invoke(this).asInstanceOf[String]).toSet
