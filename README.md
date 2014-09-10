@@ -32,7 +32,7 @@ login-framework {
     }
     ...
 }
-```.
+```
 In the section *steps* there are steps of the login flow. The each entry specifies the authentication method included in 
 the login flow. The key is the number of the step the method is run on. The value has two elements. The first is method 
 name and the second is method's flag. There are three possible values:
