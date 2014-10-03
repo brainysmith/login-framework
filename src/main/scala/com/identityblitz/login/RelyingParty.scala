@@ -24,7 +24,7 @@ case class BuiltInRelyingParty(id: String, protocol: String, params: Seq[String]
 
 object BuiltInRelyingParty {
   def apply(rp: String): BuiltInRelyingParty = {
-    val jv = JVal.parseStr(rp)
+    val jv = JVal.parse(rp)
     BuiltInRelyingParty((jv \ "id").as[String],
       (jv \ "protocol").as[String],
       (jv \ "params").asOpt[Array[String]].getOrElse(Array.empty).toSeq)

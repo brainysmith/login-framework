@@ -28,7 +28,7 @@ object Command {
   )
 
   def apply[T <: Command](base64Cmd: String): T = {
-    val jVal = JVal.parseStr(decodeAsString(base64Cmd))
+    val jVal = JVal.parse(decodeAsString(base64Cmd))
     (jVal \ "name").asOpt[String].fold[T]({
       val err = s"Deserialization of the command [$base64Cmd] failed: the name attribute is not found"
       logger.error(err)

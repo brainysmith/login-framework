@@ -41,6 +41,14 @@ name and the second is method's flag. There are three possible values:
  * optional.
 If the method flag is not specified *required* used.
 
+Authentication method
+---------------------
+The authentication method does authentication of an user. It is called by the control flow and accepts two operations, 
+*start* and *DO*. *start* operation initializes and runs the authentication process. All subsequent requests are processed 
+by *DO* operation.
+ 
+ 
+
 
 
 

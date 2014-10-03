@@ -91,7 +91,7 @@ object LoginContext {
    * @param str - string representation of [[com.identityblitz.login.LoginContext]]].
    * @return login context.
    */
-  def fromString(str: String) :LoginContext = Json.fromJson[LoginContext](JVal.parseStr(str))
+  def fromString(str: String) :LoginContext = Json.fromJson[LoginContext](JVal.parse(str))
 
   /**
    * Login context builder

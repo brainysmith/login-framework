@@ -291,12 +291,12 @@ private object AttrMeta {
     }
   }
 
-  def apply(jsonStr: String): AttrMeta = apply(JVal.parseStr(jsonStr).asInstanceOf[JObj])
+  def apply(jsonStr: String): AttrMeta = apply(JVal.parse(jsonStr).asInstanceOf[JObj])
 
   def apply(t: (String, String)): AttrMeta = new AttrMetaImpl(t._1, AttrType.withName(t._2))
 
   def parseArray(jsonStr: String): Seq[AttrMeta] = {
-    JVal.parseStr(jsonStr).asInstanceOf[JArr].map(jv => apply(jv.asInstanceOf[JObj]))
+    JVal.parse(jsonStr).asInstanceOf[JArr].map(jv => apply(jv.asInstanceOf[JObj]))
   }
 }
 

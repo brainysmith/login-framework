@@ -100,7 +100,7 @@ object LoginSession {
   }
 
 
-  private def fromString(str: String) :LoginSession = Json.fromJson[LoginSession](JVal.parseStr(str))
+  private def fromString(str: String) :LoginSession = Json.fromJson[LoginSession](JVal.parse(str))
 
   abstract class READY
   abstract class NOT_READY
