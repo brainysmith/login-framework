@@ -59,7 +59,7 @@ import static com.identityblitz.login.LoginFramework.logger;
 
 @WebServlet("/login/*")
 public class APServlet extends HttpServlet {
-    private static final Pattern pattern = Pattern.compile("login/([^/]+)(/do)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern pattern = Pattern.compile("/login/([^/]+)(/do)?", Pattern.CASE_INSENSITIVE);
 
     private Map<String, WithStart> handlers;
 
@@ -252,9 +252,12 @@ class ServletInboundTransport implements InboundTransport {
 
     @Override
     public Option<? extends Cookie> getCookie(String name) {
-        for(javax.servlet.http.Cookie c: req.getCookies()) {
-            if (c.getName().equals(name)) {
-                return Option.apply(new ServletCookieWrapper(c));
+        final javax.servlet.http.Cookie[] cookies = req.getCookies();
+        if(cookies != null) {
+            for (javax.servlet.http.Cookie c : cookies) {
+                if (c.getName().equals(name)) {
+                    return Option.apply(new ServletCookieWrapper(c));
+                }
             }
         }
         return Option.empty();
