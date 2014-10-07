@@ -32,7 +32,7 @@ libraryDependencies ++= Seq(
   "org.scala-lang" % "scala-compiler" % scalaVersion.value,   //for macros
   "org.scalatest" % "scalatest_2.10" % "2.0.1-SNAP" % "test,it",
   "org.scalacheck" %% "scalacheck" % "1.11.2" % "test,it",
-  "com.typesafe.play" % "play_2.10" % "2.2.2" % "provided" exclude("org.slf4j", "slf4j-api"),
+  "com.typesafe.play" % "play_2.10" % "2.3.4" % "provided" exclude("org.slf4j", "slf4j-api"),
   "com.unboundid" % "unboundid-ldapsdk" % "2.3.4"
 )
 

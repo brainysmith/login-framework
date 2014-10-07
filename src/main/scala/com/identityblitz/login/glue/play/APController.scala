@@ -16,7 +16,7 @@ import com.identityblitz.login.LoginFramework.logger
 import com.identityblitz.login.method.AuthnMethod
 import com.identityblitz.login.transport.RedirectResponse
 import scala.util.Failure
-import play.api.mvc.SimpleResult
+import play.api.mvc.Result
 import scala.util.Success
 import play.api.mvc.Cookie
 
@@ -161,14 +161,14 @@ object APController extends Controller {
  */
 object Forwardable extends ActionBuilder[Request] {
 
-  def invokeBlock[A](request: Request[A], block: (Request[A]) => Future[SimpleResult]): Future[SimpleResult] = {
+  def invokeBlock[A](request: Request[A], block: (Request[A]) => Future[Result]): Future[Result] = {
     block(request)
   }
 
   override protected def composeParser[A](bodyParser: BodyParser[A]): BodyParser[A] = BodyParser("Transient") {
     request =>
       request.tags.get("FORWARDED") map {
-        str => Done.apply[Array[Byte], Either[SimpleResult, A]](Right(request.asInstanceOf[Request[A]].body))
+        str => Done.apply[Array[Byte], Either[Result, A]](Right(request.asInstanceOf[Request[A]].body))
       } getOrElse{bodyParser(request)}
   }
 
@@ -227,7 +227,7 @@ private class PlayInboundTransport[A](private val req: SCSRequest[A],
   override def getCookie(name: String): Option[_ <: transport.Cookie] = req.cookies.get(name).map(PlayCookieWrapper)
 
   private def makeOutboundTransport = new OutboundTransport {
-    val resultPromise = Promise[SimpleResult]()
+    val resultPromise = Promise[Result]()
     private val futureResult = resultPromise.future
 
     private val cookiesToAdd = scala.collection.mutable.Buffer[Cookie]()
@@ -267,7 +267,7 @@ private class PlayInboundTransport[A](private val req: SCSRequest[A],
     override def discardCookie(cookie: transport.DiscardingCookie): Unit =
       cookiesToDiscard += DiscardingCookie(cookie.name, cookie.path, cookie.domain, cookie.secure)
 
-    def result: Future[SimpleResult] = {
+    def result: Future[Result] = {
       if(!self.isForwarded && !resultPromise.isCompleted)
         resultPromise.success(NotFound)
       futureResult.map(_.withCookies(cookiesToAdd: _*).discardingCookies(cookiesToDiscard: _*))(play.api.libs.concurrent.Execution.defaultContext)
@@ -296,6 +296,8 @@ private class PlayInboundTransport[A](private val req: SCSRequest[A],
     override def headers: Headers = req.headers
 
     override def remoteAddress: String = req.remoteAddress
+
+    override def secure: Boolean = req.secure
   }
 
 
