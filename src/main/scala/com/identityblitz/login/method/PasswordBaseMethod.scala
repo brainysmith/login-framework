@@ -12,7 +12,7 @@ import com.identityblitz.login.LoginFramework
  */
 class PasswordBaseMethod(val name: String, val options: Map[String, String]) extends AuthnMethod {
 
-  private val pageController = options.get("page-controller").getOrElse({
+  private val pageController = options.getOrElse("page-controller", {
     val err = "The password base method can't be instantiate because a page controller path not specified. " +
       "To fix it specify the option 'page-controller' in the configuration for this method."
     logger.error(err)
@@ -40,7 +40,7 @@ class PasswordBaseMethod(val name: String, val options: Map[String, String]) ext
 
 
   override def start(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
-    sendCommand(BindCommand(name, FormParams.allParams), pageController)
+    sendCommand(BindCommand(name, Map(), FormParams.allParams), pageController)
   }
 
   override def DO(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {

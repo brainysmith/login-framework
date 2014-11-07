@@ -1,7 +1,7 @@
 package com.identityblitz.login.service
 
 import java.util.ServiceLoader
-import com.identityblitz.login.service.spi.LoginConfService
+import com.identityblitz.login.service.spi.{RandomStringService, LoginConfService}
 
 /**
  */
@@ -13,5 +13,14 @@ object ServiceProvider {
       throw new RuntimeException("log configuration service is undefined.")
     csItr.next()
   }
+
+  lazy val randomStrService = {
+    val csItr = ServiceLoader.load(classOf[RandomStringService]).iterator()
+    if(!csItr.hasNext)
+      throw new RuntimeException("random string generation service is undefined.")
+    csItr.next()
+  }
+
+
 
 }
