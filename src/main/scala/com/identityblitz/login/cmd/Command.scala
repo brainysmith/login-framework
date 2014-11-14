@@ -51,7 +51,9 @@ object Command {
     import JWSNameKit._
     builder
       .alg(HS256)
-      .header(typ % "JWT")
+      .header(
+        typ % "JWT",
+        kid % "lgn_ctx")
       .payload(writer.write(cmd))
       .build.asBase64
   }
