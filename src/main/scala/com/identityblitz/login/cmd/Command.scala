@@ -27,10 +27,8 @@ object Command {
         case "lgn_ctx" => Some(SymmetricKey(octKey))
         case _ => None
       }
-      override def defaultKids(alg: String): Seq[JWK] =
-        throw new UnsupportedOperationException("defaultKids(alg: String)")
-      override def defaultKids(alg: String, ctx: Map[String, String]): Seq[JWK] =
-        throw new UnsupportedOperationException("defaultKids(alg: String, ctx: Map[String, String])")
+      override def defaultKids(alg: String): Seq[JWK] = Seq()
+      override def defaultKids(alg: String, ctx: Map[String, String]): Seq[JWK] = Seq()
       override def apply(kid: String): JWK = throw new UnsupportedOperationException("apply()")
     }
   }
