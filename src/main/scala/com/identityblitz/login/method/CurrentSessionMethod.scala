@@ -9,10 +9,9 @@ import com.identityblitz.login.session.LoginSession.getLs
   */
 class CurrentSessionMethod(val name: String, val options: Map[String, String]) extends AuthnMethod {
 
-  @throws(classOf[LoginException])
-  override def start(implicit req: InboundTransport, resp: OutboundTransport): Unit = DO
+  override def onStart(implicit iTr: InboundTransport, oTr: OutboundTransport) = DO
 
-  override def DO(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
+  override def onDo(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     getLs.fold{loginFlow.fail(name, BuiltInErrors.NO_SUBJECT_SESSION_FOUND)}{ls => loginFlow.success(name)}
   }
 }

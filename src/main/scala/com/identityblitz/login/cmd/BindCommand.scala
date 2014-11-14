@@ -80,11 +80,13 @@ import scala.language.postfixOps
 final case class FirstBindCommand(override val methodName: String,
                                   override val atrs: Map[String,String],
                                   override val params: Seq[String]) extends BindCommand(methodName, atrs, params) {
-  override val name: String = "firstBind"
+  override val name: String = FirstBindCommand.name
 }
 
 object FirstBindCommand {
   import JsonTools._
+
+  val name: String = "firstBind"
 
   implicit def firstBindCommandJreader = new JReader[FirstBindCommand] {
     override def read(v: JVal): JResult[FirstBindCommand] =
@@ -112,11 +114,13 @@ final case class RebindCommand(override val methodName: String,
                                override val atrs: Map[String,String],
                                override val params: Seq[String],
                                override val attempts: Int) extends BindCommand(methodName, atrs, params, attempts) {
-  override val name: String = "rebind"
+  override val name: String = RebindCommand.name
 }
 
 object RebindCommand {
   import JsonTools._
+
+  val name: String = "rebind"
 
   implicit def rebindCommandJreader = new JReader[RebindCommand] {
     override def read(v: JVal): JResult[RebindCommand] =
@@ -143,6 +147,8 @@ object RebindCommand {
 }
 
 object BindCommand {
+
+  val name: String = "bind"
 
   def apply(methodName: String, atrs: Map[String,String], params: Seq[String]) = FirstBindCommand(methodName, atrs, params)
 

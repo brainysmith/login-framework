@@ -1,15 +1,16 @@
 package com.identityblitz.login.method
 
+import com.identityblitz.json.{JError, JSuccess}
+import com.identityblitz.login.LoginFramework
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoginFramework.logger
-import com.identityblitz.login.cmd.{ChangePswdCmd, BindCommand, Command}
-import com.identityblitz.login.error.CommandException
+import com.identityblitz.login.cmd._
+import com.identityblitz.login.error.{LoginException, CommandException}
 import com.identityblitz.login.error.BuiltInErrors._
 import com.identityblitz.login.method.PasswordBaseMethod.FormParams
-import com.identityblitz.login.LoginFramework
 
 /**
- */
+  */
 class PasswordBaseMethod(val name: String, val options: Map[String, String]) extends AuthnMethod {
 
   private val pageController = options.getOrElse("page-controller", {
@@ -19,32 +20,49 @@ class PasswordBaseMethod(val name: String, val options: Map[String, String]) ext
     throw new IllegalStateException(err)
   })
 
-  private val invoker = Invoker
-    .withRecover(recover)
-    .withOnSuccess(onSuccess)
-    .build()
-
-  protected def recover(cmdException: CommandException, iTr: InboundTransport, oTr: OutboundTransport) = {
+  override protected def onRecover(cmdException: CommandException, iTr: InboundTransport, oTr: OutboundTransport) = {
     cmdException.cmd -> cmdException.error match {
-      case (bindCmd: BindCommand, INVALID_CREDENTIALS | NO_SUBJECT_FOUND | NO_CREDENTIALS_FOUND) =>
+      case (_, INTERNAL) =>
+        Left(cmdException)
+      case (bindCmd: BindCommand, _) =>
         Right(BindCommand(bindCmd))
-      case (changePswdCmd: ChangePswdCmd, INVALID_CREDENTIALS | NO_CREDENTIALS_FOUND) =>
+      case (changePswdCmd: ChangePswdCmd, _) =>
         Right(ChangePswdCmd(changePswdCmd))
       case _ =>
         Left(cmdException)
     }
   }
-  
-  protected def onSuccess(cmd: Option[Command], iTr: InboundTransport, oTr: OutboundTransport) =
-    cmd.fold(LoginFramework.loginFlow.success(name)(iTr, oTr))(sendCommand(_, pageController)(iTr, oTr))
+
+  def getCommand(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[LoginException, Command] = getCtxCmd.getOrElse {
+    val err = s"The method '$name' can't unpack unexpected command '$getBase64Cmd'."
+    logger.error(err)
+    throw new IllegalStateException(err)
+  } match {
+    case FirstBindCommand.name => Command.unpack[FirstBindCommand](getBase64Cmd)
+    case RebindCommand.name => Command.unpack[RebindCommand](getBase64Cmd)
+    case ChangePswdCmd.name => Command.unpack[ChangePswdCmd](getBase64Cmd)
+    case c =>
+      val err = s"The method '$name' can't unpack unexpected command '$c'."
+      logger.error(err)
+      throw new IllegalStateException(err)
+  }
 
 
-  override def start(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
+  override protected def onSuccess(cmd: Option[Command], iTr: InboundTransport, oTr: OutboundTransport) = cmd.fold(LoginFramework.loginFlow.success(name)(iTr, oTr))(sendCommand(_, pageController)(iTr, oTr))
+
+
+  override def onStart(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     sendCommand(BindCommand(name, Map(), FormParams.allParams), pageController)
   }
 
-  override def DO(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
-    invoker(getCommand, iTr, oTr)
+  override def onDo(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    getCommand match {
+      case Left(le) =>
+        val err = s"The method '$name' can't unpack because of unpack error '$le'."
+        logger.error(err)
+        throw new IllegalStateException(err)
+      case Right(cmd) => invoker(cmd, iTr, oTr)
+    }
   }
 }
 

@@ -30,7 +30,7 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
     throw new IllegalArgumentException(err)
   })
 
-  override val name: String = "changePassword"
+  override val name: String = ChangePswdCmd.name
 
   override def execute(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     logger.trace("Executing change password command against following bind provider: {}", providerName)
@@ -56,6 +56,8 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
 }
 
 object ChangePswdCmd {
+
+  val name = "changePassword"
 
   def apply(cmd: ChangePswdCmd) = new ChangePswdCmd(cmd.providerName, cmd.userId, cmd.attempts + 1)
 

@@ -2,11 +2,10 @@ package com.identityblitz.login.method
 
 import com.identityblitz.login.provider.{WithBind, Provider}
 import com.identityblitz.login.cmd.{Command, CommandTools}
-import com.identityblitz.login.error.{LoginError, BuiltInErrors}
+import com.identityblitz.login.error.{LoginException, CommandException, BuiltInErrors}
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login._
 import com.identityblitz.login.LoginFramework._
-import scala.Some
 
 
 /**
@@ -17,29 +16,100 @@ trait AuthnMethod extends Handler with WithName with WithStart with WithDo with 
     .getOrElse[Array[String]](Array.empty)
     .flatMap(pName => LoginFramework.findProvider[Provider with WithBind](Some(pName), classOf[Provider], classOf[WithBind]))
 
-  protected def Invoker: InvokeBuilder = new InvokeBuilder()
-    .withOnFatal(
-      (e, iTr, oTr) => {
-        loginFlow.fail(name, BuiltInErrors.INTERNAL)(iTr, oTr)
-      }
-    ).withOnFail(
-      (cmdException, iTr, oTr) => {
-        loginFlow.fail(name, cmdException.error)(iTr, oTr)
-      }
-    )
+  protected val invoker = new InvokeBuilder()
+    .withOnSuccess(onSuccess)
+    .withRecover(onRecover)
+    .withOnFail(onFail)
+    .withOnFatal(onFatal)
+    .build()
 
+  protected def onRecover(cmdException: CommandException, iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Command] = Left(cmdException)
+
+  protected def onSuccess(cmd: Option[Command], iTr: InboundTransport, oTr: OutboundTransport) = {}
+
+  protected def onFail(cmdException: CommandException, iTr: InboundTransport, oTr: OutboundTransport) = {
+    loginFlow.fail(name, cmdException.error)(iTr, oTr)
+  }
+
+  protected def onFatal(cmdException: Throwable, iTr: InboundTransport, oTr: OutboundTransport) = {
+    loginFlow.fail(name, BuiltInErrors.INTERNAL)(iTr, oTr)
+  }
+
+  def onDo(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit
+
+  def onStart(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit
+
+  @throws(classOf[LoginException])
+  override def start(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    saveCtxMethod
+    onStart
+  }
+
+  override def DO(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
+    validateMethod
+    onDo
+  }
 
   protected def sendCommand(cmd: Command, path: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    saveCtxCmd(cmd.name)
     iTr.setAttribute(FlowAttrName.COMMAND_NAME, cmd.name)
     iTr.setAttribute(FlowAttrName.COMMAND, cmd.asString())
     iTr.forward(path)
   }
 
+  protected def getBase64Cmd(implicit iTr: InboundTransport, oTr: OutboundTransport): String =
+    iTr.getParameter(FlowAttrName.COMMAND).getOrElse{
+      val err = s"The request parameter '${FlowAttrName.COMMAND}' not specified"
+      logger.error(err)
+      throw new IllegalArgumentException(err)
+    }
 
-  protected def getCommand(implicit iTr: InboundTransport, oTr: OutboundTransport) = iTr.getParameter(FlowAttrName.COMMAND).fold[Command]{
-    val err = s"The request parameter '${FlowAttrName.COMMAND}' not specified"
-    logger.error(err)
-    throw new IllegalArgumentException(err)
-  }(Command[Command])
+
+  private def validateMethod(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
+    getCtxMethod.fold {
+      val err = s"The method '$name' unexpected"
+      logger.error(err)
+      throw new IllegalArgumentException(err)
+    }{e =>
+      if (e != name) {
+        val err = s"The method '$name' not match to expected '$e'"
+        logger.error(err)
+        throw new IllegalArgumentException(err)
+      }
+    }
+  }
+
+  protected def getCtxCmd(implicit iTr: InboundTransport, oTr: OutboundTransport): Option[String] =
+    iTr.getLoginCtx.fold {
+      val err = "Login context not found."
+      logger.error(err)
+      throw new IllegalStateException(err)
+    }(_.currentCommand)
+
+
+  private def saveCtxCmd(cmd: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    iTr.updatedLoginCtx(iTr.getLoginCtx.map(_ setCurrentCommand cmd).orElse({
+      val err = "Login context not found."
+      logger.error(err)
+      throw new IllegalStateException(err)
+    }))
+  }
+
+
+  private def getCtxMethod(implicit iTr: InboundTransport, oTr: OutboundTransport): Option[String] =
+    iTr.getLoginCtx.fold {
+      val err = "Login context not found."
+      logger.error(err)
+      throw new IllegalStateException(err)
+    }(_.currentMethod)
+
+
+  private def saveCtxMethod(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    iTr.updatedLoginCtx(iTr.getLoginCtx.map(_ setCurrentMethod name).orElse({
+      val err = "Login context not found."
+      logger.error(err)
+      throw new IllegalStateException(err)
+    }))
+  }
 
 }
