@@ -1,6 +1,5 @@
 package com.identityblitz.login.method
 
-import com.identityblitz.json.{JError, JSuccess}
 import com.identityblitz.login.LoginFramework
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoginFramework.logger
