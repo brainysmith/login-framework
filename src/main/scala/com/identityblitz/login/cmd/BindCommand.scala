@@ -4,7 +4,7 @@ import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json._
 import com.identityblitz.login.LoginFramework.logger
 import com.identityblitz.login.LoginFramework
-import com.identityblitz.login.error.{CustomLoginError, LoginError, CommandException}
+import com.identityblitz.login.error.{LoginException, CustomLoginError, LoginError, CommandException}
 import com.identityblitz.login.provider.{WithBind, Provider}
 
 /**
@@ -12,8 +12,6 @@ import com.identityblitz.login.provider.{WithBind, Provider}
 
 sealed abstract class BindCommand(val methodName: String, val atrs: Map[String,String], val params: Seq[String],
                                   val attempts: Int = 0) extends Command {
-
-  import BindCommand._
 
   require(methodName != null, {
     val err = "Authentication method name can't be null"
@@ -38,19 +36,6 @@ sealed abstract class BindCommand(val methodName: String, val atrs: Map[String,S
     logger.error(err)
     throw new IllegalStateException(err)
   })
-
-  override val name: String = COMMAND_NAME
-
-  override def saveState: JVal = {
-    val json = Json.obj("method" -> JStr(methodName),
-      "atrs" -> JObj(atrs.map(e => e._1 -> JStr(e._2)).toList),
-      "params" -> JArr(params.map(JStr(_)).toArray))
-    if (attempts > 0) {
-      json + ("attempts" -> JNum(attempts))
-    } else {
-      json
-    }
-  }
 
   override def execute(implicit itr: InboundTransport, otr: OutboundTransport): Either[CommandException, Option[Command]] = {
     logger.trace("Executing bind command against following bind providers: {}", bindProviders)
@@ -88,44 +73,79 @@ sealed abstract class BindCommand(val methodName: String, val atrs: Map[String,S
     case RebindCommand(m, a, p, at) => RebindCommand(m, a ++ newAtrs, p, at)
   }
 
-  override def toString: String = new StringBuilder(this.getClass.getSimpleName).append("(")
-    .append(saveState.toJson).append(")").toString()
 }
 
-final case class FirstBindCommand(override val methodName: String, override val atrs: Map[String,String], override val params: Seq[String])
-  extends BindCommand(methodName, atrs, params) {}
+import scala.language.postfixOps
 
-final case class RebindCommand(override val methodName: String, override val atrs: Map[String,String], override val params: Seq[String],
-                               override val attempts: Int)
-  extends BindCommand(methodName, atrs, params, attempts) {}
+final case class FirstBindCommand(override val methodName: String,
+                                  override val atrs: Map[String,String],
+                                  override val params: Seq[String]) extends BindCommand(methodName, atrs, params) {
+  override val name: String = "firstBind"
+}
+
+object FirstBindCommand {
+  import JsonTools._
+
+  implicit def firstBindCommandJreader = new JReader[FirstBindCommand] {
+    override def read(v: JVal): JResult[FirstBindCommand] =
+      ((v \ "method").read[String] and
+        (v \ "atrs").read[Map[String, String]] and
+        (v \ "params").read[Seq[String]] $).lift(FirstBindCommand.apply)
+  }
+
+  implicit def firstBindCmdReader = new CmdReader[FirstBindCommand] {
+    override def read(str: JVal): Either[LoginException, FirstBindCommand] = str.read[FirstBindCommand] match {
+      case JSuccess(o) => Right(o)
+      case JError(e) => Left(LoginException(e.mkString(",")))
+    }
+  }
+
+  implicit def firstBindCmdWriter = new CmdWriter[FirstBindCommand] {
+    override def write(cmd: FirstBindCommand): JVal = Json.obj(
+      "method" -> JStr(cmd.methodName),
+      "atrs" -> JObj(cmd.atrs.map(e => e._1 -> JStr(e._2)).toList),
+      "params" -> JArr(cmd.params.map(JStr(_)).toArray))
+  }
+}
+
+final case class RebindCommand(override val methodName: String,
+                               override val atrs: Map[String,String],
+                               override val params: Seq[String],
+                               override val attempts: Int) extends BindCommand(methodName, atrs, params, attempts) {
+  override val name: String = "rebind"
+}
+
+object RebindCommand {
+  import JsonTools._
+
+  implicit def rebindCommandJreader = new JReader[RebindCommand] {
+    override def read(v: JVal): JResult[RebindCommand] =
+      ((v \ "method").read[String] and
+        (v \ "atrs").read[Map[String, String]] and
+        (v \ "params").read[Seq[String]] and
+        (v \ "attempts").read[Int] $).lift(RebindCommand.apply)
+  }
+
+  implicit def rebindCmdReader = new CmdReader[RebindCommand] {
+    override def read(str: JVal): Either[LoginException, RebindCommand] = str.read[RebindCommand] match {
+      case JSuccess(o) => Right(o)
+      case JError(e) => Left(LoginException(e.mkString(",")))
+    }
+  }
+
+  implicit def rebindCmdWriter = new CmdWriter[RebindCommand] {
+    override def write(cmd: RebindCommand): JVal = Json.obj(
+      "method" -> JStr(cmd.methodName),
+      "atrs" -> JObj(cmd.atrs.map(e => e._1 -> JStr(e._2)).toList),
+      "params" -> JArr(cmd.params.map(JStr(_)).toArray),
+      "attempts" -> JNum(cmd.attempts))
+  }
+}
 
 object BindCommand {
-
-  private[cmd] val COMMAND_NAME = "bind"
 
   def apply(methodName: String, atrs: Map[String,String], params: Seq[String]) = FirstBindCommand(methodName, atrs, params)
 
   def apply(bindCmd: BindCommand) = RebindCommand(bindCmd.methodName, bindCmd.atrs, bindCmd.params, bindCmd.attempts + 1)
 
-  private[cmd] def apply(state: JVal) = Right[String, (String, Map[String,String], Seq[String], Int)](Tuple4(null, Map(), Seq(), 0))
-    .right.flatMap(acm => (state \ "method").asOpt[String].fold[Either[String, (String, Map[String,String], Seq[String], Int)]]{
-    Left(s"Deserialization of the bind command`s state [${state.toJson}] failed: method is not specified")
-  }{Right(_, acm._2, acm._3, acm._4)})
-    .right.flatMap(acm => (state \ "atrs").asOpt[Map[String,String]].fold[Either[String, (String, Map[String,String], Seq[String], Int)]]{
-    Left(s"Deserialization of the bind command`s state [${state.toJson}] failed: atrs is not specified")
-  }{Right(acm._1, _, acm._3, acm._4)})
-    .right.flatMap(acm => (state \ "params").asOpt[Array[String]].fold[Either[String, (String, Map[String,String], Seq[String], Int)]]{
-    Left(s"Deserialization of the bind command`s state [${state.toJson}] failed: params is not specified")
-  }{Right(acm._1, acm._2, _, acm._4)})
-    .right.flatMap(acm => (state \ "attempts").asOpt[Int].fold[Either[String, (String, Map[String,String], Seq[String], Int)]]{
-    Right(acm._1, acm._2, acm._3, 0)}{Right(acm._1, acm._2, acm._3, _)}) match {
-    case Left(err) =>
-      logger.error(err)
-      throw new IllegalArgumentException(err)
-    case Right((method, atrs, params, attempt)) =>
-      if (attempt == 0)
-        FirstBindCommand(method, atrs, params)
-      else
-        RebindCommand(method, atrs, params, attempt)
-  }
 }

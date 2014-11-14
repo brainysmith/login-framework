@@ -1,7 +1,10 @@
 package com.identityblitz.login
 
+import java.security.SecureRandom
+
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoginFramework.logger
+import com.identityblitz.login.util.RandomUtil
 import scala.annotation.implicitNotFound
 import com.identityblitz.login.error.{BuiltInErrors, LoginError, LoginException}
 import com.identityblitz.login.FlowAttrName._
@@ -39,6 +42,7 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
 
     iTr.updatedLoginCtx(iTr.getAttribute(CALLBACK_URI_NAME).map(cb => {
       lcBuilder.withCallbackUri(cb)
+        .withSessionKey(RandomUtil.secureRandomBytes(32))
         .build()
     }).fold[Option[LoginContext]]{
       logger.error("Parameter {} not found in the inbound transport", CALLBACK_URI_NAME)

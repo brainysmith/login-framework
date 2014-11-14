@@ -1,6 +1,7 @@
 package com.identityblitz.login
 
 import com.identityblitz.json._
+import com.identityblitz.login.util.Base64Util
 
 trait LoginContext {
   import com.identityblitz.login.LoginContext._
@@ -28,6 +29,13 @@ trait LoginContext {
    * @return the difference, measured in milliseconds, between the last updated time and midnight, January 1, 1970 UTC.
    */
   val updatedOn: Long
+
+
+  /**
+   * Session key
+   * @return session key in octet representation
+   */
+  val sessionKey: Array[Byte]
 
   /**
    * Adds a new completed method to the already added ones.
@@ -66,6 +74,7 @@ object LoginContext {
     def write(o: LoginContext): JVal = Json.obj(
       "updatedOn" -> JNum(o.updatedOn),
       "callbackUri" -> JStr(o.callbackUri),
+      "sessionKey" -> JStr(Base64Util.encode(o.sessionKey)),
       "completedMethods" -> JArr(o.completedMethods.map(JStr(_)).toArray),
       "claims" -> o.claims
     )
@@ -73,12 +82,13 @@ object LoginContext {
 
   implicit def jreader: JReader[LoginContext] = new JReader[LoginContext] {
     def read(v: JVal): JResult[LoginContext] = {
-      Right[String, LoginContextBuilder[_]](lcBuilder).right
+      Right[String, LoginContextBuilder[_, _]](lcBuilder).right
         .flatMap(lcb => (v \ "callbackUri").asOpt[String]
-        .fold[Either[String, LoginContextBuilder[READY]]](Left("callbackUri.notFound"))(cb => Right(lcb withCallbackUri cb)))}
-      .right.map{lcb => (v \ "completedMethods").asOpt[Array[String]]
-      .fold[LoginContextBuilder[READY]](lcb)(m => m.foldLeft(lcb)(_ withCompletedMethod _))}
-      .right.map(lcb => (v \ "claims").asOpt[JVal].fold[LoginContextBuilder[READY]](lcb)(clm => lcb withClaims clm.asInstanceOf[JObj]))
+        .fold[Either[String, LoginContextBuilder[READY, _]]](Left("callbackUri.notFound"))(cb => Right(lcb withCallbackUri cb)))}
+      .right.flatMap{lcb => (v \ "sessionKey").asOpt[String]
+      .fold[Either[String, LoginContextBuilder[READY, READY]]](Left("sessionKey.notFound"))(sk => Right(lcb withSessionKey Base64Util.decode(sk)))}
+      .right.map{lcb => (v \ "completedMethods").asOpt[Array[String]].fold[LoginContextBuilder[READY, READY]](lcb)(m => m.foldLeft(lcb)(_ withCompletedMethod _))}
+      .right.map(lcb => (v \ "claims").asOpt[JVal].fold[LoginContextBuilder[READY, READY]](lcb)(clm => lcb withClaims clm.asInstanceOf[JObj]))
       .right.flatMap(lcb => (v \ "updatedOn").asOpt[Long].fold[Either[String, LoginContext]](Left("updatedOn.notFound"))(updatedOn => Right(lcb.build(updatedOn)))) match {
       case Left(err) => JError(err)
       case Right(lc) => JSuccess(lc)
@@ -99,30 +109,39 @@ object LoginContext {
   abstract class READY
   abstract class NOT_READY
 
-  class LoginContextBuilder[R](val callbackUri: String, val completedMethods: Seq[String],
-                               val claims: JObj, val updatedOn:Long) {
+  class LoginContextBuilder[C, S](val callbackUri: String,
+                                  val completedMethods: Seq[String],
+                                  val claims: JObj,
+                                  val updatedOn: Long,
+                                  val key: Array[Byte]) {
 
-    def withCallbackUri(cb: String) = new LoginContextBuilder[READY](cb, completedMethods, claims, System.currentTimeMillis())
+    def withCallbackUri(cb: String) = new LoginContextBuilder[READY, S](cb, completedMethods, claims, System.currentTimeMillis(), key)
 
-    def withCompletedMethod(method: String) = new LoginContextBuilder[R](callbackUri, completedMethods :+ method, claims, System.currentTimeMillis())
+    def withSessionKey(sessionKey: Array[Byte]) = new LoginContextBuilder[C, READY](callbackUri, completedMethods, claims, System.currentTimeMillis(), sessionKey)
+
+    def withCompletedMethod(method: String) = new LoginContextBuilder[C, S](callbackUri, completedMethods :+ method, claims, System.currentTimeMillis(), key)
 
     def withClaim[T](claim: (String, T))(implicit writer: JWriter[T]) =
-      new LoginContextBuilder[R](callbackUri, completedMethods, claims +! claim, System.currentTimeMillis())
+      new LoginContextBuilder[C, S](callbackUri, completedMethods, claims +! claim, System.currentTimeMillis(), key)
 
-    def withClaims(_claims: JObj) = new LoginContextBuilder[R](callbackUri, completedMethods, claims ++! _claims, System.currentTimeMillis())
+    def withClaims(_claims: JObj) = new LoginContextBuilder[C, S](callbackUri, completedMethods, claims ++! _claims, System.currentTimeMillis(), key)
 
   }
 
-  implicit def enableBuild(builder: LoginContextBuilder[READY]) = new {
-    def build() = new LoginContextImpl(builder.callbackUri, builder.completedMethods, builder.claims, builder.updatedOn)
+  implicit def enableBuild(builder: LoginContextBuilder[READY, READY]) = new {
+    def build() = new LoginContextImpl(builder.callbackUri, builder.completedMethods, builder.claims, builder.updatedOn, builder.key)
 
-    def build(updatedOn:Long) = new LoginContextImpl(builder.callbackUri, builder.completedMethods, builder.claims, updatedOn)
+    def build(updatedOn:Long) = new LoginContextImpl(builder.callbackUri, builder.completedMethods, builder.claims, updatedOn, builder.key)
   }
 
-  def lcBuilder = new LoginContextBuilder[NOT_READY](null, Seq(), JObj(), System.currentTimeMillis())
+  def lcBuilder = new LoginContextBuilder[NOT_READY, NOT_READY](null, Seq(), JObj(), System.currentTimeMillis(), null)
 
-  def lcBuilder(lc: LoginContext) = new LoginContextBuilder[READY](lc.callbackUri, lc.completedMethods, lc.claims, lc.updatedOn)
+  def lcBuilder(lc: LoginContext) = new LoginContextBuilder[READY, READY](lc.callbackUri, lc.completedMethods, lc.claims, lc.updatedOn, lc.sessionKey)
 
 }
 
-case class LoginContextImpl(callbackUri: String, completedMethods: Seq[String], claims: JObj, updatedOn:Long) extends LoginContext
+case class LoginContextImpl(callbackUri: String,
+                            completedMethods: Seq[String],
+                            claims: JObj,
+                            updatedOn: Long,
+                            sessionKey: Array[Byte]) extends LoginContext
