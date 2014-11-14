@@ -53,6 +53,8 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
     }
   }
 
+  override def selfpack(implicit itr: InboundTransport): String = ChangePswdCmd._selfpack(this)
+
 }
 
 object ChangePswdCmd {
@@ -84,5 +86,7 @@ object ChangePswdCmd {
       "userId" -> JStr(cmd.userId),
       "attempts" -> JNum(cmd.attempts))
   }
+
+  def _selfpack(cmd: ChangePswdCmd)(implicit itr: InboundTransport): String = Command.pack(cmd)
 
 }

@@ -14,7 +14,7 @@ trait Command {
 
   def execute(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Option[Command]]
 
-  final def asString(): String = encode(Json.obj("name" -> name).toJson)
+  def selfpack(implicit itr: InboundTransport): String
 
 }
 

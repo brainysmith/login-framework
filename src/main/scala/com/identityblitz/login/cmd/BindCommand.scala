@@ -81,6 +81,7 @@ final case class FirstBindCommand(override val methodName: String,
                                   override val atrs: Map[String,String],
                                   override val params: Seq[String]) extends BindCommand(methodName, atrs, params) {
   override val name: String = FirstBindCommand.name
+  override def selfpack(implicit itr: InboundTransport): String = FirstBindCommand._selfpack(this)
 }
 
 object FirstBindCommand {
@@ -108,6 +109,9 @@ object FirstBindCommand {
       "atrs" -> JObj(cmd.atrs.map(e => e._1 -> JStr(e._2)).toList),
       "params" -> JArr(cmd.params.map(JStr(_)).toArray))
   }
+
+  def _selfpack(cmd: FirstBindCommand)(implicit itr: InboundTransport): String = Command.pack(cmd)
+
 }
 
 final case class RebindCommand(override val methodName: String,
@@ -115,6 +119,7 @@ final case class RebindCommand(override val methodName: String,
                                override val params: Seq[String],
                                override val attempts: Int) extends BindCommand(methodName, atrs, params, attempts) {
   override val name: String = RebindCommand.name
+  override def selfpack(implicit itr: InboundTransport): String = RebindCommand._selfpack(this)
 }
 
 object RebindCommand {
@@ -144,6 +149,9 @@ object RebindCommand {
       "params" -> JArr(cmd.params.map(JStr(_)).toArray),
       "attempts" -> JNum(cmd.attempts))
   }
+
+  def _selfpack(cmd: RebindCommand)(implicit itr: InboundTransport): String = Command.pack(cmd)
+
 }
 
 object BindCommand {

@@ -53,7 +53,7 @@ trait AuthnMethod extends Handler with WithName with WithStart with WithDo with 
   protected def sendCommand(cmd: Command, path: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     saveCtxCmd(cmd.name)
     iTr.setAttribute(FlowAttrName.COMMAND_NAME, cmd.name)
-    iTr.setAttribute(FlowAttrName.COMMAND, cmd.asString())
+    iTr.setAttribute(FlowAttrName.COMMAND, cmd.selfpack)
     iTr.forward(path)
   }
 

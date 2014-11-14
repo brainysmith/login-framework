@@ -24,7 +24,7 @@ trait CommandTools {
     def build(): (Command, InboundTransport, OutboundTransport) => Unit = (cmd: Command, iTr:InboundTransport, oTr: OutboundTransport) => {
       try {
         if (logger.isTraceEnabled)
-          logger.trace("Try to execute a command: {}", cmd.asString())
+          logger.trace("Try to execute a command: {}", cmd)
         cmd.execute(iTr, oTr).left.flatMap(cmdException => {
           if (logger.isDebugEnabled)
             logger.debug("Execution of the command fails [command = {}]: {}. Try to recover.", Array(cmd, cmdException))
