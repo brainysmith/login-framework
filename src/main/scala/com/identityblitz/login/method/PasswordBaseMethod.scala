@@ -51,13 +51,13 @@ class PasswordBaseMethod(val name: String, val options: Map[String, String]) ext
 
 
   override def onStart(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    sendCommand(BindCommand(name, Map(), FormParams.allParams), pageController)
+    sendCommand(BindCommand(name, FormParams.allParams), pageController)
   }
 
   override def onDo(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     getCommand match {
       case Left(le) =>
-        val err = s"The method '$name' can't unpack because of unpack error '$le'."
+        val err = s"The method '$name' can't unpack because of error '$le'."
         logger.error(err)
         throw new IllegalStateException(err)
       case Right(cmd) => invoker(cmd, iTr, oTr)
