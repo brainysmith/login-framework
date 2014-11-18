@@ -10,7 +10,7 @@ import com.identityblitz.login.provider.{WithBind, Provider}
 /**
   */
 
-sealed abstract class BindCommand(val methodName: String, val atrs: Map[String,String], val params: Seq[String],
+sealed abstract class BindCommand(val methodName: String, val params: Seq[String],
                                   val attempts: Int = 0) extends Command {
 
   require(methodName != null, {
@@ -21,12 +21,6 @@ sealed abstract class BindCommand(val methodName: String, val atrs: Map[String,S
 
   require(params != null, {
     val err = "Params can't be null"
-    logger.error(err)
-    err
-  })
-
-  require(atrs != null, {
-    val err = "Attributes can't be null"
     logger.error(err)
     err
   })
@@ -43,7 +37,7 @@ sealed abstract class BindCommand(val methodName: String, val atrs: Map[String,S
     val data = (for {
       name <- params
       value <- itr.getParameter(name)
-    } yield (name, value)).toMap ++ atrs
+    } yield (name, value)).toMap
 
     def doBind(providers: Seq[Provider with WithBind],
                data: Map[String, String]) :Either[Seq[(String, LoginError)], (JObj, Option[Command])] = {
@@ -68,18 +62,12 @@ sealed abstract class BindCommand(val methodName: String, val atrs: Map[String,S
     })
   }
 
-  def updated(newAtrs : Map[String,String]): BindCommand = this match {
-    case FirstBindCommand(m, a, p) => FirstBindCommand(m, a ++ newAtrs, p)
-    case RebindCommand(m, a, p, at) => RebindCommand(m, a ++ newAtrs, p, at)
-  }
-
 }
 
 import scala.language.postfixOps
 
 final case class FirstBindCommand(override val methodName: String,
-                                  override val atrs: Map[String,String],
-                                  override val params: Seq[String]) extends BindCommand(methodName, atrs, params) {
+                                  override val params: Seq[String]) extends BindCommand(methodName, params) {
   override val name: String = FirstBindCommand.name
   override def selfpack(implicit itr: InboundTransport): String = FirstBindCommand._selfpack(this)
 }
@@ -92,7 +80,6 @@ object FirstBindCommand {
   implicit def firstBindCommandJreader = new JReader[FirstBindCommand] {
     override def read(v: JVal): JResult[FirstBindCommand] =
       ((v \ "method").read[String] and
-        (v \ "atrs").read[Map[String, String]] and
         (v \ "params").read[Seq[String]] $).lift(FirstBindCommand.apply)
   }
 
@@ -106,7 +93,6 @@ object FirstBindCommand {
   implicit def firstBindCmdWriter = new CmdWriter[FirstBindCommand] {
     override def write(cmd: FirstBindCommand): JVal = Json.obj(
       "method" -> JStr(cmd.methodName),
-      "atrs" -> JObj(cmd.atrs.map(e => e._1 -> JStr(e._2)).toList),
       "params" -> JArr(cmd.params.map(JStr(_)).toArray))
   }
 
@@ -115,9 +101,8 @@ object FirstBindCommand {
 }
 
 final case class RebindCommand(override val methodName: String,
-                               override val atrs: Map[String,String],
                                override val params: Seq[String],
-                               override val attempts: Int) extends BindCommand(methodName, atrs, params, attempts) {
+                               override val attempts: Int) extends BindCommand(methodName, params, attempts) {
   override val name: String = RebindCommand.name
   override def selfpack(implicit itr: InboundTransport): String = RebindCommand._selfpack(this)
 }
@@ -130,7 +115,6 @@ object RebindCommand {
   implicit def rebindCommandJreader = new JReader[RebindCommand] {
     override def read(v: JVal): JResult[RebindCommand] =
       ((v \ "method").read[String] and
-        (v \ "atrs").read[Map[String, String]] and
         (v \ "params").read[Seq[String]] and
         (v \ "attempts").read[Int] $).lift(RebindCommand.apply)
   }
@@ -145,7 +129,6 @@ object RebindCommand {
   implicit def rebindCmdWriter = new CmdWriter[RebindCommand] {
     override def write(cmd: RebindCommand): JVal = Json.obj(
       "method" -> JStr(cmd.methodName),
-      "atrs" -> JObj(cmd.atrs.map(e => e._1 -> JStr(e._2)).toList),
       "params" -> JArr(cmd.params.map(JStr(_)).toArray),
       "attempts" -> JNum(cmd.attempts))
   }
@@ -158,8 +141,8 @@ object BindCommand {
 
   val name: String = "bind"
 
-  def apply(methodName: String, atrs: Map[String,String], params: Seq[String]) = FirstBindCommand(methodName, atrs, params)
+  def apply(methodName: String, params: Seq[String]) = FirstBindCommand(methodName, params)
 
-  def apply(bindCmd: BindCommand) = RebindCommand(bindCmd.methodName, bindCmd.atrs, bindCmd.params, bindCmd.attempts + 1)
+  def apply(bindCmd: BindCommand) = RebindCommand(bindCmd.methodName, bindCmd.params, bindCmd.attempts + 1)
 
 }

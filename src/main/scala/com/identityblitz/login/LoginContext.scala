@@ -167,9 +167,9 @@ object LoginContext {
   }
 
   implicit def enableBuild(builder: LoginContextBuilder[READY, READY]) = new {
-    def build() = new LoginContextImpl(builder.callbackUri, builder.completedMethods, builder.claims, builder.updatedOn, builder.key, builder.currentMethod, builder.currentMethod)
+    def build() = new LoginContextImpl(builder.callbackUri, builder.completedMethods, builder.claims, builder.updatedOn, builder.key, builder.currentMethod, builder.currentCommand)
 
-    def build(updatedOn:Long) = new LoginContextImpl(builder.callbackUri, builder.completedMethods, builder.claims, updatedOn, builder.key, builder.currentMethod, builder.currentMethod)
+    def build(updatedOn:Long) = new LoginContextImpl(builder.callbackUri, builder.completedMethods, builder.claims, updatedOn, builder.key, builder.currentMethod, builder.currentCommand)
   }
 
   def lcBuilder = new LoginContextBuilder[NOT_READY, NOT_READY](null, Seq(), JObj(), System.currentTimeMillis(), null, None, None)
