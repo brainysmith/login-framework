@@ -56,26 +56,6 @@ object Command {
       .build.asBase64
   }
 
-
-
-  /*private val cmdMap = Map[String, (JVal => Command)](
-    BindCommand.COMMAND_NAME -> {(state: JVal) => BindCommand(state)},
-    ChangePswdCmd.COMMAND_NAME -> {(state: JVal) => ChangePswdCmd(state)}
-  )*/
-
-  /*def apply[T <: Command](base64Cmd: String): T = {
-    val jVal = JVal.parse(decodeAsString(base64Cmd))
-    (jVal \ "name").asOpt[String].fold[T]({
-      val err = s"Deserialization of the command [$base64Cmd] failed: the name attribute is not found"
-      logger.error(err)
-      throw new IllegalArgumentException(err)
-    })(name => cmdMap.get(name).map(_(jVal \ "state")).getOrElse({
-      val err = s"Deserialization of the command [$base64Cmd] failed: unknown command`s name [$name]"
-      logger.error(err)
-      throw new IllegalArgumentException(err)
-    }).asInstanceOf[T])
-  }*/
-
 }
 
 @implicitNotFound("No reader found for command of type ${C}. Try to implement an implicit CmdReader.")

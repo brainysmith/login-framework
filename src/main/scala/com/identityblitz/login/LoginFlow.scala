@@ -5,6 +5,7 @@ import java.security.SecureRandom
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoginFramework.logger
 import com.identityblitz.login.util.RandomUtil
+import org.apache.commons.lang.StringUtils
 import scala.annotation.implicitNotFound
 import com.identityblitz.login.error.{BuiltInErrors, LoginError, LoginException}
 import com.identityblitz.login.FlowAttrName._
@@ -71,7 +72,7 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
   }
 
   /**
-   * Not successfully completes the current authentication method and call the method [[onFail]] to define the next point
+   * Not successfully completes the current authentication method and calls the method [[onFail]] to define next point
    * of the login flow.
    *
    * @param method - not successfully completed authentication method
@@ -82,6 +83,17 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
   final def fail(method: String, cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     logger.trace("An authentication method '{}' has been completed not successfully. Getting a nex point ...", method)
     onFail(method, cause)
+  }
+
+  /**
+   * Skips the current step and calls the method [[onSkip]] to jump on next point of the login flow.
+   * @param method - the current method
+   * @param iTr - inbound transport
+   * @param oTr - outbound transport
+   */
+  final def skip(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    logger.trace("An authentication method '{}' has been skipped.", method)
+    onSkip(method)
   }
 
 
@@ -147,7 +159,7 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
 
   /**
    * Calls when current authentication method is completed successfully.
-   * The method must redirect or forward request to the next point of the login flow.
+   * The method must redirect or forward request to next point of the login flow.
    * For complete the current login flow and return result to consumer call [[endWithSuccess]] or [[endWithError]].
    *
    * @param iTr - inbound transport
@@ -157,7 +169,7 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
 
   /**
    * Calls when current authentication method is completed not successfully.
-   * The method must redirect or forward request to the next point of the login flow.
+   * The method must redirect or forward request to next point of the login flow.
    * For complete the current login flow and return result to consumer call [[endWithSuccess]] or [[endWithError]].
    *
    * @param cause - string with error cause
@@ -165,6 +177,16 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
    * @param oTr - outbound transport
    */
   protected def onFail(method: String, cause: LoginError)(implicit iTr: InboundTransport, oTr: OutboundTransport)
+
+  /**
+   * Calls when the current authentication method and respectively the current step must be skipped. The method must
+   * redirect or forward request to next step of the login flow.
+   *
+   * @param method - the current method being skipped
+   * @param iTr - inbound transport
+   * @param oTr - outbound transport
+   */
+  protected def onSkip(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport)
 }
 
 object LoginFlow {
@@ -179,90 +201,111 @@ object LoginFlow {
 
 
 
-class DefaultLoginFlow(val options: Map[String, String]) extends LoginFlow {
+class DefaultLoginFlow(val config: Map[String, String]) extends LoginFlow {
 
-  protected object MethodFlag extends Enumeration {
-    type MethodFlag = Value
+  protected object StepOption extends Enumeration {
+    type StepOption = Value
     val sufficient, required, optional = Value
   }
 
-  import MethodFlag._
+  import StepOption._
 
-  protected case class MethodMeta(method: AuthnMethod, flag: MethodFlag)
+  protected case class Step(n: Int,
+                            alternateMethods: Array[AuthnMethod],
+                            option: StepOption)
 
-  protected object MethodMeta {
-    def apply(raw: String): MethodMeta = {
-      val parts = raw.split(":").map(_.trim).filter(!_.isEmpty)
-      val m = LoginFramework.methods(parts(0))
-      val f = if (parts.length > 1) MethodFlag.withName(parts(1)) else MethodFlag.required
-      MethodMeta(m, f)
-    }
+
+  private lazy val steps = configSteps
+
+  private def configSteps = {
+    val processed = config.toSeq.filter(_._1.startsWith("steps.")).sortBy(_._1).map(_._2).map(_.split(":") match {
+      case Array(opt, mtds) => mtds.split(",") match {
+        case Array() => Left(Seq(s"Authentication methods not specified"))
+        case _@ams =>
+          val resolved = ams.map(name => LoginFramework.methods.get(name)
+            .toRight(s"Authentication method ${name} not found"))
+          val errors = resolved.collect { case Left(e) => e}.foldLeft(Seq[String]())(_ :+ _)
+          if (errors.isEmpty) Right((StepOption.withName(opt), resolved.collect { case Right(v) => v})) else Left(errors)
+      }
+      case _@item => Left(Seq(s"Got wrong step item ${item}"))
+    })
+
+    if(processed.isEmpty)
+      throw new IllegalStateException("No steps defined")
+
+    val errors = processed.collect{case Left(e) => e}.fold(Seq())(_ ++ _)
+    if(errors.isEmpty) TreeMap(processed.collect{case Right(v) => v}.zipWithIndex.map(p => (p._2, Step(p._2, p._1._2, p._1._1))) :_*)
+    else throw new IllegalStateException(errors.mkString(";"))
   }
 
-  protected case class Step(n: Int, methods: Array[MethodMeta])
-
-  protected object Step {
-    /** attention about t._1.replaceAll("\"",""): i don't no why but the number of step contains double quote **/
-    def apply(t: (String, String)): Step = Step(t._1.replaceAll("\"","").toInt,
-      t._2.split(",").map(_.trim).filter(!_.isEmpty).map(MethodMeta(_)))
-  }
-
-
-  protected lazy val steps = TreeMap(options.toList.filter(_._1.startsWith("steps"))
-    .map(t => t._1.stripPrefix("steps.") -> t._2)
-    .map(Step(_))
-    .map(step => step.n -> step): _*)
 
   protected lazy val lastStep = steps.last._2
 
-  protected lazy val requiredSteps = steps.values
-    .filter(_.methods.exists(mm => mm.flag == MethodFlag.required))
-    .map(_.n)
-
-  protected lazy val methodIndex = steps.values.map(step => {
-    step.methods.map(mm => mm.method.name -> (step -> mm))
-  }).flatten.toMap
+  protected lazy val requiredSteps = steps.values.filter(_.option == required).toSet
 
   protected def isLastStep(step: Step) = step.n == lastStep.n
 
-  protected def completedSteps(implicit iTr: InboundTransport, oTr: OutboundTransport) = iTr.getLoginCtx.get.completedMethods.map(methodIndex(_)._1.n).toSet
+  protected lazy val methodToStep = steps.toSeq.map(a => a._2.alternateMethods.toSeq.map(m => (m.name, a._2))).flatten.toMap
 
-  protected def flowResult(implicit iTr: InboundTransport, oTr: OutboundTransport) = !requiredSteps.isEmpty && requiredSteps.forall(completedSteps contains)
+  protected def completedSteps(implicit iTr: InboundTransport, oTr: OutboundTransport) = iTr.getLoginCtx.get.completedMethods.map(methodToStep(_)).toSet
+
+  protected def flowResult(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    val completed = completedSteps
+    if(requiredSteps.nonEmpty) requiredSteps.subsetOf(completed) else completed.exists(_.option == sufficient)
+  }
+
+
 
   protected def nextStep(currentStep: Step)(implicit iTr: InboundTransport, oTr: OutboundTransport) {
     steps.from(currentStep.n).tail.headOption.fold{
-      if (logger.isTraceEnabled)
-        logger.trace("It was the last step: [{}]", currentStep)
+      if (logger.isTraceEnabled) logger.trace("It was the last step: [{}]", currentStep)
       flowResult match {
         case false => endWithError(BuiltInErrors.FLOW_NOT_COMPLETED_PROPERLY)
         case true => endWithSuccess
       }
     }{case (i, nextStep) =>
-      if (logger.isTraceEnabled)
-        logger.trace("Go to the next step: [{}]", nextStep)
-      nextStep.methods.head.method.start
+      if (logger.isTraceEnabled) logger.trace("Go to the next step: [{}]", nextStep)
+      nextStep.alternateMethods.head.start
     }
   }
 
-  override protected def onStart(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
-    steps.head._2.methods.head.method.start
+  override protected def onStart(implicit iTr: InboundTransport,
+                                 oTr: OutboundTransport): Unit = steps.head._2.alternateMethods.head.start
+
+  override protected def onFail(method: String, cause: LoginError)(implicit iTr: InboundTransport,
+                                                                   oTr: OutboundTransport): Unit = endWithError(cause)
+
+  override protected def onSuccess(method: String)(implicit iTr: InboundTransport,
+                                                   oTr: OutboundTransport): Unit = nextStep(methodToStep(method))
+
+  override protected def onSkip(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
+    val step = methodToStep(method)
+    if(step.option == required)
+      throw new IllegalStateException(s"Authentication method ${method} on step with option [required] can not be skipped.")
+    nextStep(step)
   }
 
-  override protected def onFail(method: String, cause: LoginError)
-                               (implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
-    val (step, methodMeta) = methodIndex(method)
-    methodMeta.flag match {
-      case MethodFlag.required  => endWithError(cause)
-      case _ => nextStep(step)
-    }
-  }
+  override def options: Map[String, String] = throw new UnsupportedOperationException
 
-  override protected def onSuccess(method: String)
-                                  (implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
-    val (step, methodMeta) = methodIndex(method)
-    methodMeta.flag match {
-      case MethodFlag.sufficient => endWithSuccess
-      case _ => nextStep(step)
+  /*  protected case class MethodMeta(method: AuthnMethod, level: Int = 1) {
+      if(level < 1 && level > 15)
+        throw new IllegalArgumentException("Authentication level has wrong value: " + level)
     }
-  }
+
+    protected object MethodMeta {
+      def apply(raw: String): MethodMeta = {
+        val parts = raw.split(":").map(_.trim).filter(!_.isEmpty)
+        val m = LoginFramework.methods(parts(0))
+        val f = if (parts.length > 1) MethodFlag.withName(parts(1)) else MethodFlag.required
+        MethodMeta(m, f)
+      }
+    }*/
+  /*protected object Step {
+    /** attention about t._1.replaceAll("\"",""): i don't no why but the number of step contains double quote **/
+    def apply(t: (String, String)): Step = Step(t._1.replaceAll("\"","").toInt,
+      t._2.split(",").map(_.trim).filter(!_.isEmpty).map(MethodMeta(_)))
+  }*/
+
+  //protected def flowResult(implicit iTr: InboundTransport, oTr: OutboundTransport) = !requiredSteps.isEmpty && requiredSteps.forall(completedSteps contains)
+
 }

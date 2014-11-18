@@ -12,6 +12,6 @@ class CurrentSessionMethod(val name: String, val options: Map[String, String]) e
   override def onStart(implicit iTr: InboundTransport, oTr: OutboundTransport) = DO
 
   override def onDo(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    getLs.fold{loginFlow.fail(name, BuiltInErrors.NO_SUBJECT_SESSION_FOUND)}{ls => loginFlow.success(name)}
+    getLs.fold{loginFlow.skip(name)}{ls => loginFlow.success(name)}
   }
 }
