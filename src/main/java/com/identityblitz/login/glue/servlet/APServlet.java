@@ -61,18 +61,16 @@ import static com.identityblitz.login.LoginFramework.logger;
 public class APServlet extends HttpServlet {
     private static final Pattern pattern = Pattern.compile("/login/([^/]+)(/do)?", Pattern.CASE_INSENSITIVE);
 
-    private Map<String, WithStart> handlers;
+    private Map<String, AuthnMethod> handlers;
 
     @Override
     public void init() throws ServletException {
-        handlers = new HashMap<String, WithStart>(LoginFramework$.MODULE$.methods().size() + 1);
+        handlers = new HashMap<String, AuthnMethod>(LoginFramework$.MODULE$.methods().size() + 1);
 
         for(Map.Entry<String, AuthnMethod> entry : WrapAsJava$.MODULE$.mapAsJavaMap(
                 LoginFramework$.MODULE$.methods()).entrySet()) {
             handlers.put(entry.getKey(), entry.getValue());
         }
-        handlers.put("flow", LoginFramework.loginFlow());
-        handlers.put("logout", LoginFramework.logoutFlow());
     }
 
     @Override
@@ -119,13 +117,23 @@ public class APServlet extends HttpServlet {
             final String action = matcher.group(2);
 
             try {
-                if ("/do".equalsIgnoreCase(action)) {
-                    ((AuthnMethod)handlers.get(method)).DO(itr, otr);
+                if (handlers.containsKey(method)){
+                    if ("/do".equalsIgnoreCase(action)) {
+                        handlers.get(method).DO(itr, otr);
+                    } else {
+                        LoginFramework.loginFlow().switchTo(method, itr, otr);
+                    }
                 } else {
-                    handlers.get(method).start(itr, otr);
+                    if ("flow".equalsIgnoreCase(method)){
+                        LoginFramework.loginFlow().start(itr, otr);
+                    } else if ("logout".equalsIgnoreCase(method)){
+                        LoginFramework.logoutFlow().start(itr, otr);
+                    } else {
+                        throw new IllegalStateException("No matches for url: " + req.getServletPath());
+                    }
                 }
             }
-            catch (LoginException e) {
+            catch (Exception e) {
                 throw new ServletException(e);
             }
 
