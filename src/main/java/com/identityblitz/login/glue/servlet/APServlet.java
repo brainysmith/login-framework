@@ -72,6 +72,7 @@ public class APServlet extends HttpServlet {
             handlers.put(entry.getKey(), entry.getValue());
         }
         handlers.put("flow", LoginFramework.loginFlow());
+        handlers.put("logout", LoginFramework.logoutFlow());
     }
 
     @Override
