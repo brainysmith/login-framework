@@ -251,10 +251,8 @@ class DefaultLoginFlow(val config: Map[String, String]) extends LoginFlow {
 
   protected def flowResult(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     val completed = completedSteps
-    if(requiredSteps.nonEmpty) requiredSteps.subsetOf(completed) else completed.exists(_.option == sufficient)
+    requiredSteps.nonEmpty && requiredSteps.subsetOf(completed)
   }
-
-
 
   protected def nextStep(currentStep: Step)(implicit iTr: InboundTransport, oTr: OutboundTransport) {
     steps.from(currentStep.n).tail.headOption.fold{
@@ -276,7 +274,10 @@ class DefaultLoginFlow(val config: Map[String, String]) extends LoginFlow {
                                                                    oTr: OutboundTransport): Unit = endWithError(cause)
 
   override protected def onSuccess(method: String)(implicit iTr: InboundTransport,
-                                                   oTr: OutboundTransport): Unit = nextStep(methodToStep(method))
+                                                   oTr: OutboundTransport): Unit = {
+    val step = methodToStep(method)
+    if(step.option == sufficient) endWithSuccess else nextStep(step)
+  }
 
   override protected def onSkip(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
     val step = methodToStep(method)

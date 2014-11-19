@@ -47,7 +47,7 @@ class LoginFlowTest extends FlatSpec with Matchers {
     itr.attrs.keys should contain ("callback_uri")
     itr.attrs.keys should contain ("command_name")
     itr.attrs.keys should contain ("command")
-    itr.attrs.values should contain ("firstBind")
+    itr.attrs.values should contain ("bind")
     itr.pathToForward should be ("/blitz/lgpage")
   }
 
