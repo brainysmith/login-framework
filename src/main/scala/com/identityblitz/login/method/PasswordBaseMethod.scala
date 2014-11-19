@@ -6,7 +6,6 @@ import com.identityblitz.login.LoginFramework.logger
 import com.identityblitz.login.cmd._
 import com.identityblitz.login.error.{LoginException, CommandException}
 import com.identityblitz.login.error.BuiltInErrors._
-import com.identityblitz.login.method.PasswordBaseMethod.FormParams
 
 /**
   */
@@ -37,8 +36,7 @@ class PasswordBaseMethod(val name: String, val options: Map[String, String]) ext
     logger.error(err)
     throw new IllegalStateException(err)
   } match {
-    case FirstBindCommand.name => Command.unpack[FirstBindCommand](getBase64Cmd)
-    case RebindCommand.name => Command.unpack[RebindCommand](getBase64Cmd)
+    case BindCommand.name => Command.unpack[BindCommand](getBase64Cmd)
     case ChangePswdCmd.name => Command.unpack[ChangePswdCmd](getBase64Cmd)
     case c =>
       val err = s"The method '$name' can't unpack unexpected command '$c'."
@@ -51,7 +49,7 @@ class PasswordBaseMethod(val name: String, val options: Map[String, String]) ext
 
 
   override def onStart(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    sendCommand(BindCommand(name, FormParams.allParams), pageController)
+    sendCommand(BindCommand(name), pageController)
   }
 
   override def onDo(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
@@ -65,17 +63,3 @@ class PasswordBaseMethod(val name: String, val options: Map[String, String]) ext
   }
 }
 
-object PasswordBaseMethod {
-
-  object FormParams extends Enumeration {
-    import scala.language.implicitConversions
-
-    type Options = Value
-    val login, password = Value
-
-    implicit def valueToString(v: Value): String = v.toString
-
-    val allParams = values.map(_.toString).toSeq
-  }
-
-}

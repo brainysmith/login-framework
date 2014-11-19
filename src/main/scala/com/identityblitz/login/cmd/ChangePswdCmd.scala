@@ -8,7 +8,7 @@ import com.identityblitz.login.LoginFramework.logger
 import com.identityblitz.login.LoginFramework
 import com.identityblitz.login.provider.WithChangePassword
 
-case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0) extends Command {
+class ChangePswdCmd private (val providerName: String, val userId: String, val attempts: Int) extends Command {
 
   require(providerName != null, {
     val err = "Provider's name can't be null"
@@ -31,10 +31,10 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
   })
 
   override val name: String = ChangePswdCmd.name
-
+  import ChangePswdCmd.FormParams._
   override def execute(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     logger.trace("Executing change password command against following bind provider: {}", providerName)
-    (iTr.getParameter("currentPassword"), iTr.getParameter("newPassword")) match {
+    (iTr.getParameter(currentPassword), iTr.getParameter(newPassword)) match {
       case (Some(curPswd), Some(newPswd)) =>
         provider.changePswd(userId, curPswd, newPswd)
           .left.map(CommandException(this, _))
@@ -54,14 +54,30 @@ case class ChangePswdCmd(providerName: String, userId: String, attempts: Int = 0
   }
 
   override def selfpack(implicit itr: InboundTransport): String = ChangePswdCmd._selfpack(this)
-
 }
 
 object ChangePswdCmd {
 
   val name = "changePassword"
 
+  object FormParams extends Enumeration {
+    import scala.language.implicitConversions
+
+    type Options = Value
+    val currentPassword, newPassword = Value
+
+    implicit def valueToString(v: Value): String = v.toString
+
+    val allParams = values.map(_.toString).toSeq
+  }
+
+
   def apply(cmd: ChangePswdCmd) = new ChangePswdCmd(cmd.providerName, cmd.userId, cmd.attempts + 1)
+
+  def apply(providerName: String, userId: String) = new ChangePswdCmd(providerName, userId, 0)
+
+  def unapply(cmd: ChangePswdCmd): Option[(String, String, Int)] =
+    Some((cmd.providerName, cmd.userId, cmd.attempts))
 
   import JsonTools._
   import scala.language.postfixOps
@@ -70,7 +86,7 @@ object ChangePswdCmd {
     override def read(v: JVal): JResult[ChangePswdCmd] =
       ((v \ "provider").read[String] and
         (v \ "userId").read[String] and
-        (v \ "attempts").read[Int] $).lift(ChangePswdCmd.apply)
+        (v \ "attempts").read[Int] $).lift((p,u,a) => new ChangePswdCmd(p,u,a))
   }
 
   implicit def changePswdCmdReader = new CmdReader[ChangePswdCmd] {

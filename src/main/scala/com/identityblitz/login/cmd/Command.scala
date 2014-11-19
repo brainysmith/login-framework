@@ -12,6 +12,8 @@ trait Command {
 
   def name: String
 
+  def attrs: Map[String,String] = Map.empty
+
   def execute(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Option[Command]]
 
   def selfpack(implicit itr: InboundTransport): String

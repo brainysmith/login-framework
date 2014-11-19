@@ -10,17 +10,12 @@ import com.identityblitz.login.provider.{WithBind, Provider}
 /**
   */
 
-sealed abstract class BindCommand(val methodName: String, val params: Seq[String],
-                                  val attempts: Int = 0) extends Command {
+import scala.language.postfixOps
+
+class BindCommand private (val methodName: String, val attempts: Int) extends Command {
 
   require(methodName != null, {
     val err = "Authentication method name can't be null"
-    logger.error(err)
-    err
-  })
-
-  require(params != null, {
-    val err = "Params can't be null"
     logger.error(err)
     err
   })
@@ -31,11 +26,12 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
     throw new IllegalStateException(err)
   })
 
+  import BindCommand.FormParams._
   override def execute(implicit itr: InboundTransport, otr: OutboundTransport): Either[CommandException, Option[Command]] = {
     logger.trace("Executing bind command against following bind providers: {}", bindProviders)
 
     val data = (for {
-      name <- params
+      name <- allParams
       value <- itr.getParameter(name)
     } yield (name, value)).toMap
 
@@ -62,87 +58,55 @@ sealed abstract class BindCommand(val methodName: String, val params: Seq[String
     })
   }
 
-}
-
-import scala.language.postfixOps
-
-final case class FirstBindCommand(override val methodName: String,
-                                  override val params: Seq[String]) extends BindCommand(methodName, params) {
-  override val name: String = FirstBindCommand.name
-  override def selfpack(implicit itr: InboundTransport): String = FirstBindCommand._selfpack(this)
-}
-
-object FirstBindCommand {
-  import JsonTools._
-
-  val name: String = "firstBind"
-
-  implicit def firstBindCommandJreader = new JReader[FirstBindCommand] {
-    override def read(v: JVal): JResult[FirstBindCommand] =
-      ((v \ "method").read[String] and
-        (v \ "params").read[Seq[String]] $).lift(FirstBindCommand.apply)
-  }
-
-  implicit def firstBindCmdReader = new CmdReader[FirstBindCommand] {
-    override def read(str: JVal): Either[LoginException, FirstBindCommand] = str.read[FirstBindCommand] match {
-      case JSuccess(o) => Right(o)
-      case JError(e) => Left(LoginException(e.mkString(",")))
-    }
-  }
-
-  implicit def firstBindCmdWriter = new CmdWriter[FirstBindCommand] {
-    override def write(cmd: FirstBindCommand): JVal = Json.obj(
-      "method" -> JStr(cmd.methodName),
-      "params" -> JArr(cmd.params.map(JStr(_)).toArray))
-  }
-
-  def _selfpack(cmd: FirstBindCommand)(implicit itr: InboundTransport): String = Command.pack(cmd)
+  override val name: String = BindCommand.name
+  override def selfpack(implicit itr: InboundTransport): String = BindCommand._selfpack(this)
 
 }
 
-final case class RebindCommand(override val methodName: String,
-                               override val params: Seq[String],
-                               override val attempts: Int) extends BindCommand(methodName, params, attempts) {
-  override val name: String = RebindCommand.name
-  override def selfpack(implicit itr: InboundTransport): String = RebindCommand._selfpack(this)
-}
 
-object RebindCommand {
-  import JsonTools._
-
-  val name: String = "rebind"
-
-  implicit def rebindCommandJreader = new JReader[RebindCommand] {
-    override def read(v: JVal): JResult[RebindCommand] =
-      ((v \ "method").read[String] and
-        (v \ "params").read[Seq[String]] and
-        (v \ "attempts").read[Int] $).lift(RebindCommand.apply)
-  }
-
-  implicit def rebindCmdReader = new CmdReader[RebindCommand] {
-    override def read(str: JVal): Either[LoginException, RebindCommand] = str.read[RebindCommand] match {
-      case JSuccess(o) => Right(o)
-      case JError(e) => Left(LoginException(e.mkString(",")))
-    }
-  }
-
-  implicit def rebindCmdWriter = new CmdWriter[RebindCommand] {
-    override def write(cmd: RebindCommand): JVal = Json.obj(
-      "method" -> JStr(cmd.methodName),
-      "params" -> JArr(cmd.params.map(JStr(_)).toArray),
-      "attempts" -> JNum(cmd.attempts))
-  }
-
-  def _selfpack(cmd: RebindCommand)(implicit itr: InboundTransport): String = Command.pack(cmd)
-
-}
 
 object BindCommand {
+  import JsonTools._
 
   val name: String = "bind"
 
-  def apply(methodName: String, params: Seq[String]) = FirstBindCommand(methodName, params)
+  object FormParams extends Enumeration {
+    import scala.language.implicitConversions
 
-  def apply(bindCmd: BindCommand) = RebindCommand(bindCmd.methodName, bindCmd.params, bindCmd.attempts + 1)
+    type Options = Value
+    val login, password = Value
+
+    implicit def valueToString(v: Value): String = v.toString
+
+    val allParams = values.map(_.toString).toSeq
+  }
+
+  implicit def bindCommandJreader = new JReader[BindCommand] {
+    override def read(v: JVal): JResult[BindCommand] =
+      ((v \ "method").read[String] and
+        (v \ "attempts").read[Int] $).lift((m,a) => new BindCommand(m,a))
+  }
+
+  implicit def bindCmdReader = new CmdReader[BindCommand] {
+    override def read(str: JVal): Either[LoginException, BindCommand] = str.read[BindCommand] match {
+      case JSuccess(o) => Right(o)
+      case JError(e) => Left(LoginException(e.mkString(",")))
+    }
+  }
+
+  implicit def bindCmdWriter = new CmdWriter[BindCommand] {
+    override def write(cmd: BindCommand): JVal = Json.obj(
+      "method" -> JStr(cmd.methodName),
+      "attempts" -> JNum(cmd.attempts))
+  }
+
+  def _selfpack(cmd: BindCommand)(implicit itr: InboundTransport): String = Command.pack(cmd)
+
+  def apply(methodName: String) = new BindCommand(methodName, 0)
+
+  def apply(bindCmd: BindCommand) = new BindCommand(bindCmd.methodName, bindCmd.attempts + 1)
+
+  def unapply(bindCmd: BindCommand): Option[(String, Int)] =
+    Some((bindCmd.methodName, bindCmd.attempts))
 
 }

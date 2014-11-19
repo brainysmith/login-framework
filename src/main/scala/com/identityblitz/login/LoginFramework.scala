@@ -16,6 +16,10 @@ object LoginFramework {
 
   lazy val providers: Map[String, Provider] = confService.getDeepMapString("providers").map(t => t._1 -> Handler(t))
 
+  private lazy val commandsOptions: Map[String, Map[String,String]] = confService.getDeepMapString("commands")
+
+  def commandConf(name: String): Option[Map[String,String]] = commandsOptions.get(name)
+
   lazy val methods: Map[String, AuthnMethod] = confService.getDeepMapString("authn-methods").map(t => t._1 -> Handler(t))
 
   lazy val loginFlow = LoginFlow(confService.getMapString("login-flow"))

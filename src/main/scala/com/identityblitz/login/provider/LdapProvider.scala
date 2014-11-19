@@ -5,10 +5,8 @@ import com.unboundid.ldap.sdk._
 import com.unboundid.util.ssl.{TrustAllTrustManager, SSLUtil}
 import com.identityblitz.json._
 import scala.util.Try
-import com.identityblitz.login.cmd.{ChangePswdCmd, Command}
+import com.identityblitz.login.cmd.{BindCommand, ChangePswdCmd, Command}
 import com.unboundid.ldap.sdk.controls.PasswordExpiredControl
-import com.identityblitz.login.method.PasswordBaseMethod
-import PasswordBaseMethod.FormParams
 import com.identityblitz.login.error.LoginError
 import com.identityblitz.login.error.BuiltInErrors._
 import scala.util.Failure
@@ -69,9 +67,11 @@ class LdapBindProvider(val name:String, val options: Map[String, String]) extend
   /** bossiness functions **/
 
   override def bind(data: Map[String, String]): Either[LoginError, (JObj, Option[Command])] = {
-    val userDnOpt = data.get(FormParams.login).map(lgnVal => interpolate(userDnPtn, Map(FormParams.login.toString -> lgnVal)))
+
+
+    val userDnOpt = data.get(BindCommand.FormParams.login).map(lgnVal => interpolate(userDnPtn, Map(BindCommand.FormParams.login.toString -> lgnVal)))
     logger.trace("Try to bind to '{}' LDAP [userDN = {}]", name, userDnOpt)
-    userDnOpt -> data.get(FormParams.password) match {
+    userDnOpt -> data.get(BindCommand.FormParams.password) match {
       case (Some(userDn), Some(pswd)) =>
         val resWrapped = ldap { implicit connection =>
           Try {
@@ -85,7 +85,7 @@ class LdapBindProvider(val name:String, val options: Map[String, String]) extend
                   //todo: add logic for near expiring password
                   case Some(control) =>
                     logger.trace("The user's password has expired [userDn = {}, ldap = {}]", userDn, name)
-                    Right[LoginError, (JObj, Option[Command])](JObj() -> Some(new ChangePswdCmd(name, userDn)))
+                    Right[LoginError, (JObj, Option[Command])](JObj() -> Some(ChangePswdCmd(name, userDn)))
                   case None =>
                     val claims = getUserAttributes(userDn)
                     Right[LoginError, (JObj, Option[Command])](claims -> None)

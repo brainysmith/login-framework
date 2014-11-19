@@ -1,7 +1,7 @@
 package com.identityblitz.login.service
 
 import java.util.ServiceLoader
-import com.identityblitz.login.service.spi.{RandomStringService, LoginConfService}
+import com.identityblitz.login.service.spi.{CryptoService, RandomStringService, LoginConfService}
 
 /**
  */
@@ -18,6 +18,13 @@ object ServiceProvider {
     val csItr = ServiceLoader.load(classOf[RandomStringService]).iterator()
     if(!csItr.hasNext)
       throw new RuntimeException("random string generation service is undefined.")
+    csItr.next()
+  }
+
+  lazy val cryptoService = {
+    val csItr = ServiceLoader.load(classOf[CryptoService]).iterator()
+    if(!csItr.hasNext)
+      throw new RuntimeException("crypto service is undefined.")
     csItr.next()
   }
 
