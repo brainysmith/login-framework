@@ -21,5 +21,11 @@ trait CryptoService {
    */
   def generateRandomString(allowedChars: Array[Char], length: Int): String
 
+  /**
+   * Generate a array of random bytes.
+   * @param length - length of the array being generated
+   * @return - generated array
+   */
+  def generateRandomBytes(length: Int): Array[Byte]
 
 }

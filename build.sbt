@@ -34,7 +34,8 @@ libraryDependencies ++= Seq(
   "org.scalatest" % "scalatest_2.10" % "2.0.1-SNAP" % "test,it",
   "org.scalacheck" %% "scalacheck" % "1.11.2" % "test,it",
   "com.typesafe.play" % "play_2.10" % "2.3.4" % "provided" exclude("org.slf4j", "slf4j-api"),
-  "com.unboundid" % "unboundid-ldapsdk" % "2.3.4"
+  "com.unboundid" % "unboundid-ldapsdk" % "2.3.4",
+  "org.bouncycastle" % "bcprov-jdk15on" % "1.48"
 )
 
 scalacOptions ++= List("-feature","-deprecation", "-unchecked")
