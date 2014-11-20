@@ -3,7 +3,6 @@ package com.identityblitz.login
 import com.identityblitz.login.service.ServiceProvider
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoginFramework.logger
-import com.identityblitz.login.util.RandomUtil
 import scala.annotation.implicitNotFound
 import com.identityblitz.login.error.{BuiltInErrors, LoginError, LoginException}
 import com.identityblitz.login.FlowAttrName._
