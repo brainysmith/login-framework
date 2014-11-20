@@ -130,6 +130,7 @@ object APController extends Controller {
           }(s => s))
           logoutFlow.start
         case Call(m, "/do", _) => authMethods(m).DO
+        case Call(m, "/switch", _) => loginFlow.switchTo(m)
         case c @ Call(_, _, _) =>
           logger.error("Got a wrong call: {}.", c)
           throw new IllegalArgumentException("Got a wrong call: " + c + ".")

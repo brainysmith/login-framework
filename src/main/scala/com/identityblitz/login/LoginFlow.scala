@@ -3,6 +3,7 @@ package com.identityblitz.login
 import com.identityblitz.login.service.ServiceProvider
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoginFramework.logger
+import com.identityblitz.login.util.RandomUtil
 import scala.annotation.implicitNotFound
 import com.identityblitz.login.error.{BuiltInErrors, LoginError, LoginException}
 import com.identityblitz.login.FlowAttrName._
@@ -91,6 +92,17 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
   final def skip(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     logger.trace("An authentication method '{}' has been skipped.", method)
     onSkip(method)
+  }
+
+  /**
+   * Switch the current method and calls the method [[onSwitchTo]] to jump to alternative method of the same point of the login flow.
+   * @param method - the new method
+   * @param iTr - inbound transport
+   * @param oTr - outbound transport
+   */
+  final def switchTo(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    logger.trace("An authentication method has been switched to {}.", method)
+    onSwitchTo(method)
   }
 
 
@@ -184,6 +196,17 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
    * @param oTr - outbound transport
    */
   protected def onSkip(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport)
+
+  /**
+   * Calls when the current authentication method must be switched to an alternative method in the same step. The method must
+   * redirect or forward request to start a new method of the same point of the login flow.
+   *
+   * @param method - the new method
+   * @param iTr - inbound transport
+   * @param oTr - outbound transport
+   */
+  protected def onSwitchTo(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport)
+
 }
 
 object LoginFlow {
@@ -222,11 +245,11 @@ class DefaultLoginFlow(val config: Map[String, String]) extends LoginFlow {
         case Array() => Left(Seq(s"Authentication methods not specified"))
         case _@ams =>
           val resolved = ams.map(name => LoginFramework.methods.get(name)
-            .toRight(s"Authentication method ${name} not found"))
+            .toRight(s"Authentication method '$name' not found"))
           val errors = resolved.collect { case Left(e) => e}.foldLeft(Seq[String]())(_ :+ _)
           if (errors.isEmpty) Right((StepOption.withName(opt), resolved.collect { case Right(v) => v})) else Left(errors)
       }
-      case _@item => Left(Seq(s"Got wrong step item ${item}"))
+      case _@item => Left(Seq(s"Got wrong step item '$item'"))
     })
 
     if(processed.isEmpty)
@@ -245,6 +268,13 @@ class DefaultLoginFlow(val config: Map[String, String]) extends LoginFlow {
   protected def isLastStep(step: Step) = step.n == lastStep.n
 
   protected lazy val methodToStep = steps.toSeq.map(a => a._2.alternateMethods.toSeq.map(m => (m.name, a._2))).flatten.toMap
+
+  protected def currentMethod(implicit iTr: InboundTransport, oTr: OutboundTransport): Option[String] =
+    iTr.getLoginCtx.fold {
+      val err = "Login context not found."
+      logger.error(err)
+      throw new IllegalStateException(err)
+    }(_.currentMethod)
 
   protected def completedSteps(implicit iTr: InboundTransport, oTr: OutboundTransport) = iTr.getLoginCtx.get.completedMethods.map(methodToStep(_)).toSet
 
@@ -281,8 +311,25 @@ class DefaultLoginFlow(val config: Map[String, String]) extends LoginFlow {
   override protected def onSkip(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
     val step = methodToStep(method)
     if(step.option == required)
-      throw new IllegalStateException(s"Authentication method ${method} on step with option [required] can not be skipped.")
+      throw new IllegalStateException(s"Authentication method '$method' on step with option [required] can not be skipped.")
     nextStep(step)
+  }
+
+  override protected def onSwitchTo(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+    val currentStep = currentMethod.fold {
+      val err = s"Authentication process can not be switched to method '$method' hence it is not started"
+      logger.error(err)
+      throw new IllegalStateException(err)
+    }(methodToStep(_))
+
+    val suitableMethods = currentStep.alternateMethods.filter(_.name == method)
+
+    if(suitableMethods.isEmpty){
+      val err = s"Authentication process can not be switched to method '$method' that is not belong to the current step '${currentStep.n}'"
+      logger.error(err)
+      throw new IllegalStateException(err)
+    }
+    suitableMethods(0).start
   }
 
   override def options: Map[String, String] = throw new UnsupportedOperationException
