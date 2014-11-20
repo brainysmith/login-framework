@@ -54,6 +54,7 @@ trait AuthnMethod extends Handler with WithName with WithStart with WithDo with 
     saveCtxCmd(cmd.name)
     iTr.setAttribute(FlowAttrName.COMMAND_NAME, cmd.name)
     iTr.setAttribute(FlowAttrName.COMMAND, cmd.selfpack)
+    iTr.setAttribute(FlowAttrName.COMMAND_ATTEMPTS, cmd.attempts.toString)
     for (a <- cmd.attrs) {
       iTr.setAttribute(a._1, a._2)
     }

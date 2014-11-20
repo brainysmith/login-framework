@@ -12,6 +12,8 @@ object FlowAttrName {
 
   val COMMAND_NAME = "command_name"
 
+  val COMMAND_ATTEMPTS = "command_attempts"
+
   val HTTP_METHOD = "http_method"
 
   val ERROR = "error"

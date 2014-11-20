@@ -57,7 +57,7 @@ import static com.identityblitz.login.LoginFramework.logger;
  * </table>
  */
 
-@WebServlet("/login/*")
+
 public class APServlet extends HttpServlet {
     private static final Pattern pattern = Pattern.compile("/login/([^/]+)(/do)?", Pattern.CASE_INSENSITIVE);
 

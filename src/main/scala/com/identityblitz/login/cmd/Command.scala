@@ -3,14 +3,14 @@ package com.identityblitz.login.cmd
 import com.identityblitz.jwt.{SimpleCryptoService, JwsToolkit, AlgorithmsKit}
 import com.identityblitz.login.error.{LoginException, CommandException}
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
-import com.identityblitz.json.{Json, JVal}
-import com.identityblitz.login.LoginFramework.logger
-import com.identityblitz.login.util.Base64Util._
+import com.identityblitz.json.JVal
 import scala.annotation.implicitNotFound
 
 trait Command {
 
   def name: String
+
+  def attempts: Int
 
   def attrs: Map[String,String] = Map.empty
 
