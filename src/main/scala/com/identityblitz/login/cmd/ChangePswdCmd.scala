@@ -17,7 +17,7 @@ class ChangePswdCmd private (val providerName: String, val userId: String, val a
   })
 
   require(userId != null, {
-    val err = "User identificator can't be null"
+    val err = "User identifier can't be null"
     logger.error(err)
     err
   })
@@ -32,7 +32,7 @@ class ChangePswdCmd private (val providerName: String, val userId: String, val a
 
   override val name: String = ChangePswdCmd.name
   import ChangePswdCmd.FormParams._
-  override def execute(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+  override def onExecute(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     logger.trace("Executing change password command against following bind provider: {}", providerName)
     (iTr.getParameter(currentPassword), iTr.getParameter(newPassword)) match {
       case (Some(curPswd), Some(newPswd)) =>

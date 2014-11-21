@@ -27,8 +27,9 @@ class BindCommand private (val methodName: String, val attempts: Int) extends Co
   })
 
   import BindCommand.FormParams._
-  override def execute(implicit itr: InboundTransport, otr: OutboundTransport): Either[CommandException, Option[Command]] = {
-    logger.trace("Executing bind command against following bind providers: {}", bindProviders)
+  override def onExecute(implicit itr: InboundTransport, otr: OutboundTransport): Either[CommandException, Option[Command]] = {
+    if (logger.isTraceEnabled)
+      logger.trace("Executing bind command against following bind providers: {}", bindProviders)
 
     val data = (for {
       name <- allParams

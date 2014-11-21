@@ -12,7 +12,7 @@ object FlowAttrName {
 
   val COMMAND_NAME = "command_name"
 
-  val COMMAND_ATTEMPTS = "command_attempts"
+  val COMMAND_LEFT_ATTEMPTS = "command_left_attempts"
 
   val HTTP_METHOD = "http_method"
 

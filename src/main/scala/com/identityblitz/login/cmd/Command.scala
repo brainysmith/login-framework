@@ -1,10 +1,12 @@
 package com.identityblitz.login.cmd
 
 import com.identityblitz.jwt.{SimpleCryptoService, JwsToolkit, AlgorithmsKit}
+import com.identityblitz.login.LoginFramework._
 import com.identityblitz.login.error.{LoginException, CommandException}
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.json.JVal
 import scala.annotation.implicitNotFound
+import com.identityblitz.login.error.BuiltInErrors._
 
 trait Command {
 
@@ -12,9 +14,30 @@ trait Command {
 
   def attempts: Int
 
+  def maxAttempts: Option[Int] = None
+
+  def leftAttempts: Option[Int] = maxAttempts.map(max => max - attempts)
+
+  def noAttempts = leftAttempts.fold(false)(_ <= 0)
+
+  def isExpired: Boolean = false
+
   def attrs: Map[String,String] = Map.empty
 
-  def execute(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Option[Command]]
+  def execute(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Option[Command]] = {
+    if (isExpired) {
+      logger.error(s"Command '$name' is expired")
+      Left(CommandException(this, COMMAND_EXPIRED))
+    } else if (noAttempts) {
+      logger.error(s"Command '$name' no attempts")
+      Left(CommandException(this, COMMAND_NO_ATTEMPTS))
+    } else {
+      onExecute
+    }
+  }
+
+  def onExecute(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Option[Command]]
+
 
   def selfpack(implicit itr: InboundTransport): String
 
