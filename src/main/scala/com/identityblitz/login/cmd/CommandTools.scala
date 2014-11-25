@@ -32,7 +32,7 @@ trait CommandTools {
           recover(cmdException, iTr, oTr).right.flatMap(cmd => Right(Some(cmd)))
         }) match {
           case Left(cmdException) =>
-            logger.debug("No any recovery specified for the command exception: {}", cmdException)
+            logger.debug("No any recovery specified for the command exception: {}", cmdException.error)
             onFail(cmdException, iTr, oTr)
           case Right(res) =>
             logger.debug("Execution of the command is completed successfully or the command was recovered. Getting command: {}", res)

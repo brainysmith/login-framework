@@ -8,6 +8,8 @@ import com.identityblitz.json.JVal
 import scala.annotation.implicitNotFound
 import com.identityblitz.login.error.BuiltInErrors._
 
+import scala.util.Right
+
 trait Command {
 
   def name: String
@@ -28,12 +30,8 @@ trait Command {
     if (isExpired) {
       logger.error(s"Command '$name' is expired")
       Left(CommandException(this, COMMAND_EXPIRED))
-    } else if (noAttempts) {
-      logger.error(s"Command '$name' no attempts")
-      Left(CommandException(this, COMMAND_NO_ATTEMPTS))
-    } else {
-      onExecute
     }
+    onExecute
   }
 
   def onExecute(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Option[Command]]

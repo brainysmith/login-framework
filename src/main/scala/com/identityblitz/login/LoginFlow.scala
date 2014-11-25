@@ -291,7 +291,7 @@ class DefaultLoginFlow(val config: Map[String, String]) extends LoginFlow {
       }
     }{case (i, nextStep) =>
       if (logger.isTraceEnabled) logger.trace("Go to the next step: [{}]", nextStep)
-      nextStep.alternateMethods.head.start
+      nextStep.alternateMethods(0).start
     }
   }
 
