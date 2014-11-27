@@ -32,14 +32,14 @@ class PasswordBaseMethod(val name: String, val options: Map[String, String]) ext
   }
 
   def getCommand(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[LoginException, Command] = getCtxCmd.getOrElse {
-    val err = s"The method '$name' can't unpack unexpected command '$getBase64Cmd'."
+    val err = s"Can't parse command '$getBase64Cmd' for method '$name'."
     logger.error(err)
     throw new IllegalStateException(err)
   } match {
     case BindCommand.name => Command.unpack[BindCommand](getBase64Cmd)
     case ChangePswdCmd.name => Command.unpack[ChangePswdCmd](getBase64Cmd)
     case c =>
-      val err = s"The method '$name' can't unpack unexpected command '$c'."
+      val err = s"Occurred unexpected command '$c' for method '$name'."
       logger.error(err)
       throw new IllegalStateException(err)
   }
@@ -55,7 +55,7 @@ class PasswordBaseMethod(val name: String, val options: Map[String, String]) ext
   override def onDo(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     getCommand match {
       case Left(le) =>
-        val err = s"The method '$name' can't unpack because of error '$le'."
+        val err = s"Can't unpack command for method '$name' because of error '$le'."
         logger.error(err)
         throw new IllegalStateException(err)
       case Right(cmd) => invoker(cmd, iTr, oTr)

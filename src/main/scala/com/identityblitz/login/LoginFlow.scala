@@ -39,9 +39,10 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
     }
 
     iTr.updatedLoginCtx(iTr.getAttribute(CALLBACK_URI_NAME).map(cb => {
-      lcBuilder.withCallbackUri(cb)
+      val lcb = lcBuilder
+        .withCallbackUri(cb)
         .withSessionKey(LoginFlow.cryptoSrv.generateRandomBytes(32))
-        .build()
+      iTr.getAttribute(RELYING_PARTY).fold(lcb.build())(lcb.withRelayingParty(_).build())
     }).fold[Option[LoginContext]]{
       logger.error("Parameter {} not found in the inbound transport", CALLBACK_URI_NAME)
       throw new LoginException(s"Parameter $CALLBACK_URI_NAME not found in the inbound transport")
