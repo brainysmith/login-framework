@@ -5,7 +5,7 @@ name := "login-framework"
 
 organization := "com.identityblitz"
 
-version := "0.1.2"
+version := "0.1.2-SNAPSHOT"
 
 licenses := Seq("MIT License" -> url("http://www.opensource.org/licenses/mit-license.php"))
 
@@ -23,13 +23,27 @@ resolvers += "Local Maven Repository" at Path.userHome.asFile.toURI.toURL + "/.m
 
 resolvers += "Typesafe releases" at "http://repo.typesafe.com/typesafe/releases"
 
+
+resolvers += "Reaxoft Nexus" at "http://build.reaxoft.loc/store/content/repositories/blitz-snapshots"
+
+val nexus = "http://build.reaxoft.loc/store/content/repositories"
+
+credentials += Credentials("Sonatype Nexus Repository Manager", "build.reaxoft.loc", "deployment", "oracle_1")
+
+publishTo <<= version { (v: String) =>
+  if (v.trim.endsWith("SNAPSHOT"))
+    Some("snapshots" at nexus + "/blitz-snapshots")
+  else
+    Some("releases"  at nexus + "/blitz-releases")
+}
+
 libraryDependencies ++= Seq(
   "javax.servlet" % "javax.servlet-api" % "3.0.1",
   "org.slf4j" % "slf4j-api" % "1.6.6",
   "commons-codec" % "commons-codec" % "1.9",
   "commons-lang" % "commons-lang" % "2.6",
-  "com.identityblitz" % "json-lib" % "0.1.0",
-  "com.identityblitz" % "scs-lib" % "0.2.0",
+  "com.identityblitz" % "json-lib" % "0.1.0-SNAPSHOT",
+  "com.identityblitz" % "scs-lib" % "0.2.0-SNAPSHOT",
   "org.scala-lang" % "scala-compiler" % scalaVersion.value,   //for macros
   "org.scalatest" % "scalatest_2.10" % "2.0.1-SNAP" % "test,it",
   "org.scalacheck" %% "scalacheck" % "1.11.2" % "test,it",
