@@ -62,6 +62,6 @@ jacoco.settings
 //itJacoco.settings
 
 //Style Check section 
-org.scalastyle.sbt.ScalastylePlugin.Settings
+//org.scalastyle.sbt.ScalastylePlugin.Settings
  
-org.scalastyle.sbt.PluginKeys.config <<= baseDirectory { _ / "src/main/config" / "scalastyle-config.xml" }
+//org.scalastyle.sbt.PluginKeys.config <<= baseDirectory { _ / "src/main/config" / "scalastyle-config.xml" }
