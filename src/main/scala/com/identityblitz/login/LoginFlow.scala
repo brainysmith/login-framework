@@ -1,5 +1,7 @@
 package com.identityblitz.login
 
+import java.util.UUID
+
 import com.identityblitz.login.service.ServiceProvider
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoginFramework.logger
@@ -41,6 +43,7 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
     iTr.updatedLoginCtx(iTr.getAttribute(CALLBACK_URI_NAME).map(cb => {
       val lcb = lcBuilder
         .withCallbackUri(cb)
+        .withIdentifier(UUID.randomUUID().toString)
         .withSessionKey(LoginFlow.cryptoSrv.generateRandomBytes(32))
       iTr.getAttribute(RELYING_PARTY).fold(lcb.build())(lcb.withRelayingParty(_).build())
     }).fold[Option[LoginContext]]{
@@ -119,14 +122,19 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
       logger.debug("The login flow is completed successfully [lc = {}].", lc.asString)
 
     /** create a login session **/
-    val ls = getLs.fold[LoginSessionBuilder[_, _, READY]](lsBuilder)(ls => lsBuilder(ls))
+    val ls = getLs.fold[LoginSessionBuilder[_, _, _, READY]](lsBuilder)(ls => lsBuilder(ls))
+      .withIdentifier(lc.id)
       .withClaims(lc.claims)
       .withMethods(lc.completedMethods: _*)
       .build()
+
     updateLs(ls)
 
     /** remove the current login context **/
+    iTr.getLoginCtx.map {lc => lc.relayingParty.map {rp => iTr.setAttribute(FlowAttrName.RELYING_PARTY, rp )}}
     iTr.updatedLoginCtx(None)
+
+    onSuccessLogin(ls)
 
     /** call back **/
     val cbUrl = lc.callbackUri
@@ -206,6 +214,15 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
    * @param oTr - outbound transport
    */
   protected def onSwitchTo(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport)
+  /**
+   * Calls when flow process completed successfully.
+   *
+   * @param iTr - inbound transport
+   * @param oTr - outbound transport
+   */
+
+
+  protected def onSuccessLogin(ls: LoginSession)(implicit iTr: InboundTransport, oTr: OutboundTransport)
 
 }
 
@@ -299,13 +316,24 @@ class DefaultLoginFlow(val config: Map[String, String]) extends LoginFlow {
   override protected def onStart(implicit iTr: InboundTransport,
                                  oTr: OutboundTransport): Unit = steps.head._2.alternateMethods.head.start
 
+  override protected def onSuccessLogin(ls: LoginSession)(implicit iTr: InboundTransport,
+                                 oTr: OutboundTransport): Unit =
+    ServiceProvider.securityService.map {
+    _.onLogin(ls,iTr)
+  }
+
+
   override protected def onFail(method: String, cause: LoginError)(implicit iTr: InboundTransport,
                                                                    oTr: OutboundTransport): Unit = endWithError(cause)
 
   override protected def onSuccess(method: String)(implicit iTr: InboundTransport,
                                                    oTr: OutboundTransport): Unit = {
     val step = methodToStep(method)
-    if(step.option == sufficient) endWithSuccess else nextStep(step)
+    if(step.option == sufficient){
+
+      endWithSuccess
+    }
+    else nextStep(step)
   }
 
   override protected def onSkip(method: String)(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {

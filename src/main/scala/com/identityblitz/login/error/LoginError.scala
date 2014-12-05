@@ -7,15 +7,15 @@ trait LoginError {
 
   def name: String
 
-  def params: Seq[String]
+  def params: Map[String,String]
 
   override def toString: String = new StringBuilder("LoginError(name=").append(name)
-    .append(", params=").append(params)
+    .append(", params=").append(params.mkString(", "))
     .append(")")
     .toString()
 }
 
-case class CustomLoginError(name: String, params: Seq[String] = Seq()) extends LoginError
+case class CustomLoginError(name: String, params: Map[String,String] = Map()) extends LoginError
 
 /**
  * Enumeration of build in errors of a login process.
@@ -23,7 +23,7 @@ case class CustomLoginError(name: String, params: Seq[String] = Seq()) extends L
 object BuiltInErrors extends Enumeration {
   import scala.language.implicitConversions
 
-  case class BuiltInError(name: String, params: Seq[String] = Seq()) extends Val(name) with LoginError
+  case class BuiltInError(name: String, params: Map[String,String] = Map()) extends Val(name) with LoginError
 
   val INTERNAL = BuiltInError("internal")
   val INVALID_CREDENTIALS = BuiltInError("invalid_credentials")

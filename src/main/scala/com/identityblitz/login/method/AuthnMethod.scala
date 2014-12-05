@@ -3,6 +3,7 @@ package com.identityblitz.login.method
 import com.identityblitz.login.provider.{WithBind, Provider}
 import com.identityblitz.login.cmd.{Command, CommandTools}
 import com.identityblitz.login.error.{LoginException, CommandException, BuiltInErrors}
+import com.identityblitz.login.service.ServiceProvider
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login._
 import com.identityblitz.login.LoginFramework._
@@ -18,10 +19,15 @@ trait AuthnMethod extends Handler with WithName with WithStart with WithDo with 
 
   protected val invoker = new InvokeBuilder()
     .withOnSuccess(onSuccess)
-    .withRecover(onRecover)
+    .withRecover(recover)
     .withOnFail(onFail)
     .withOnFatal(onFatal)
     .build()
+
+  private def recover(cmdException: CommandException, iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Command] = {
+    ServiceProvider.securityService.map { s => iTr.getLoginCtx.map{ l => s.onLoginFail(cmdException.error, l, iTr)}}
+    onRecover(cmdException, iTr, oTr)
+  }
 
   protected def onRecover(cmdException: CommandException, iTr: InboundTransport, oTr: OutboundTransport): Either[CommandException, Command] = Left(cmdException)
 
@@ -41,7 +47,7 @@ trait AuthnMethod extends Handler with WithName with WithStart with WithDo with 
 
   @throws(classOf[LoginException])
   override def start(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    saveCtxMethod
+    saveCurMethod
     onStart
   }
 
@@ -51,7 +57,7 @@ trait AuthnMethod extends Handler with WithName with WithStart with WithDo with 
   }
 
   protected def sendCommand(cmd: Command, path: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    saveCtxCmd(cmd.name)
+    saveCurCmd(cmd.name)
     iTr.setAttribute(FlowAttrName.COMMAND_NAME, cmd.name)
     iTr.setAttribute(FlowAttrName.COMMAND, cmd.selfpack)
     cmd.leftAttempts.map(la => iTr.setAttribute(FlowAttrName.COMMAND_LEFT_ATTEMPTS, la.toString))
@@ -71,7 +77,7 @@ trait AuthnMethod extends Handler with WithName with WithStart with WithDo with 
 
 
   private def validateMethod(implicit iTr: InboundTransport, oTr: OutboundTransport): Unit = {
-    getCtxMethod.fold {
+    getCurMethod.fold {
       val err = s"The method '$name' unexpected"
       logger.error(err)
       throw new IllegalArgumentException(err)
@@ -84,7 +90,7 @@ trait AuthnMethod extends Handler with WithName with WithStart with WithDo with 
     }
   }
 
-  protected def getCtxCmd(implicit iTr: InboundTransport, oTr: OutboundTransport): Option[String] =
+  protected def getCurCmd(implicit iTr: InboundTransport, oTr: OutboundTransport): Option[String] =
     iTr.getLoginCtx.fold {
       val err = "Login context not found."
       logger.error(err)
@@ -92,7 +98,7 @@ trait AuthnMethod extends Handler with WithName with WithStart with WithDo with 
     }(_.currentCommand)
 
 
-  private def saveCtxCmd(cmd: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+  private def saveCurCmd(cmd: String)(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     iTr.updatedLoginCtx(iTr.getLoginCtx.map(_ setCurrentCommand cmd).orElse({
       val err = "Login context not found."
       logger.error(err)
@@ -101,7 +107,7 @@ trait AuthnMethod extends Handler with WithName with WithStart with WithDo with 
   }
 
 
-  private def getCtxMethod(implicit iTr: InboundTransport, oTr: OutboundTransport): Option[String] =
+  private def getCurMethod(implicit iTr: InboundTransport, oTr: OutboundTransport): Option[String] =
     iTr.getLoginCtx.fold {
       val err = "Login context not found."
       logger.error(err)
@@ -109,7 +115,7 @@ trait AuthnMethod extends Handler with WithName with WithStart with WithDo with 
     }(_.currentMethod)
 
 
-  private def saveCtxMethod(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
+  private def saveCurMethod(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
     iTr.updatedLoginCtx(iTr.getLoginCtx.map(_ setCurrentMethod name).orElse({
       val err = "Login context not found."
       logger.error(err)

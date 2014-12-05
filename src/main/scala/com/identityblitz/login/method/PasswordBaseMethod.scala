@@ -31,7 +31,7 @@ class PasswordBaseMethod(val name: String, val options: Map[String, String]) ext
     }
   }
 
-  def getCommand(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[LoginException, Command] = getCtxCmd.getOrElse {
+  def getCommand(implicit iTr: InboundTransport, oTr: OutboundTransport): Either[LoginException, Command] = getCurCmd.getOrElse {
     val err = s"Can't parse command '$getBase64Cmd' for method '$name'."
     logger.error(err)
     throw new IllegalStateException(err)
