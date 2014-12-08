@@ -23,18 +23,17 @@ resolvers += "Local Maven Repository" at Path.userHome.asFile.toURI.toURL + "/.m
 
 resolvers += "Typesafe releases" at "http://repo.typesafe.com/typesafe/releases"
 
+resolvers += "Reaxoft Public Repository" at "http://build.reaxoft.loc/store/content/groups/public"
 
-resolvers += "Reaxoft Nexus" at "http://build.reaxoft.loc/store/content/repositories/blitz-snapshots"
-
-val nexus = "http://build.reaxoft.loc/store/content/repositories"
+val reaxoft_local_repository = "http://build.reaxoft.loc/store/content/repositories"
 
 credentials += Credentials("Sonatype Nexus Repository Manager", "build.reaxoft.loc", "deployment", "oracle_1")
 
 publishTo <<= version { (v: String) =>
   if (v.trim.endsWith("SNAPSHOT"))
-    Some("snapshots" at nexus + "/blitz-snapshots")
+    Some("snapshots" at reaxoft_local_repository + "/blitz-snapshots")
   else
-    Some("releases"  at nexus + "/blitz-releases")
+    Some("releases"  at reaxoft_local_repository + "/blitz-releases")
 }
 
 libraryDependencies ++= Seq(
