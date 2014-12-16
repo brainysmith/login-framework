@@ -43,8 +43,8 @@ libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-api" % "1.6.6",
   "commons-codec" % "commons-codec" % "1.9",
   "commons-lang" % "commons-lang" % "2.6",
-  "com.identityblitz" % "json-lib" % "0.1.0-SNAPSHOT",
-  "com.identityblitz" % "scs-lib" % "0.2.0-SNAPSHOT",
+  "com.identityblitz" % "json-lib" % "0.1.0",
+  "com.identityblitz" % "scs-lib" % "0.2.0",
   "org.scala-lang" % "scala-compiler" % scalaVersion.value,   //for macros
   "org.scalatest" % "scalatest_2.10" % "2.0.1-SNAP" % "test,it",
   "org.scalacheck" %% "scalacheck" % "1.11.2" % "test,it",
