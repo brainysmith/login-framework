@@ -2,6 +2,7 @@ package com.identityblitz.login
 
 import java.util.UUID
 
+import com.identityblitz.login.LoginContext.READY
 import com.identityblitz.login.service.ServiceProvider
 import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
 import com.identityblitz.login.LoginFramework.logger
@@ -13,7 +14,7 @@ import java.net.URLEncoder
 import com.identityblitz.login.method.AuthnMethod
 import scala.collection.immutable.TreeMap
 import com.identityblitz.login.session.LoginSession
-import com.identityblitz.login.session.LoginSession.LoginSessionBuilder
+import com.identityblitz.login.session.LoginSession._
 
 /**
  * Defines a flow of the login process.
@@ -40,10 +41,14 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
         iTr.getAttribute(CALLBACK_URI_NAME))
     }
 
+    val id = getLs.fold(UUID.randomUUID().toString){
+       ls => ls.id
+    }
+
     iTr.updatedLoginCtx(iTr.getAttribute(CALLBACK_URI_NAME).map(cb => {
       val lcb = lcBuilder
         .withCallbackUri(cb)
-        .withIdentifier(UUID.randomUUID().toString)
+        .withIdentifier(id)
         .withSessionKey(LoginFlow.cryptoSrv.generateRandomBytes(32))
       iTr.getAttribute(RELYING_PARTY).fold(lcb.build())(lcb.withRelayingParty(_).build())
     }).fold[Option[LoginContext]]{
