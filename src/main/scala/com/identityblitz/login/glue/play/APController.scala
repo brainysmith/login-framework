@@ -13,6 +13,8 @@ import play.api.Play.current
 import java.util.regex.Pattern
 import scala.util.Try
 import com.identityblitz.login.LoginFramework.logger
+import com.identityblitz.login.LoginFramework.directRequestEnabled
+import com.identityblitz.login.LoginFramework.contextPath
 import com.identityblitz.login.method.AuthnMethod
 import com.identityblitz.login.transport.RedirectResponse
 import scala.util.Failure
@@ -58,7 +60,7 @@ import play.api.mvc.Cookie
 object APController extends Controller {
   implicit val reflective = scala.language.reflectiveCalls
 
-  val loginPath = "/login/"
+  val loginPath = contextPath + "/login/"
 
   val authMethods: Map[String, AuthnMethod] = LoginFramework.methods
   val loginFlow = LoginFramework.loginFlow
@@ -116,14 +118,25 @@ object APController extends Controller {
       Call(handler, directCall) match {
         case Call("flow", null, true) => loginFlow.start
         case Call("flow", null, false) =>
+          if (!directRequestEnabled) {
+            val err = "direct request is not enabled"
+            logger.error(err)
+            throw new SecurityException(err)
+          }
           itr.setAttribute(FlowAttrName.CALLBACK_URI_NAME, itr.getParameter(FlowAttrName.CALLBACK_URI_NAME).fold[String]{
             logger.error("callback_uri is not specified.")
             throw new IllegalArgumentException("callback_uri is not specified.")
           }(s => s))
           itr.getParameter(FlowAttrName.AUTHN_METHOD_NAME).foreach(itr.setAttribute(FlowAttrName.AUTHN_METHOD_NAME, _))
+          itr.getParameter(FlowAttrName.RELYING_PARTY).foreach(rp => itr.setAttribute(FlowAttrName.RELYING_PARTY, new BuiltInRelyingParty(rp, "DIRECT_REQUEST").asString()))
           loginFlow.start
         case Call("logout", null, true) => logoutFlow.start
         case Call("logout", null, false) =>
+          if (!directRequestEnabled) {
+            val err = "direct request is not enabled"
+            logger.error(err)
+            throw new SecurityException(err)
+          }
           itr.setAttribute(FlowAttrName.CALLBACK_URI_NAME, itr.getParameter(FlowAttrName.CALLBACK_URI_NAME).fold[String]{
             logger.error("callback_uri is not specified.")
             throw new IllegalArgumentException("callback_uri is not specified.")

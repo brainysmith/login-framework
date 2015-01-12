@@ -1,20 +1,20 @@
 package com.identityblitz.login
 
+import java.net.URLEncoder
 import java.util.UUID
 
-import com.identityblitz.login.LoginContext.READY
-import com.identityblitz.login.service.ServiceProvider
-import com.identityblitz.login.transport.{OutboundTransport, InboundTransport}
-import com.identityblitz.login.LoginFramework.logger
-import scala.annotation.implicitNotFound
-import com.identityblitz.login.error.{BuiltInErrors, LoginError, LoginException}
 import com.identityblitz.login.FlowAttrName._
 import com.identityblitz.login.LoginContext._
-import java.net.URLEncoder
+import com.identityblitz.login.LoginFramework.logger
+import com.identityblitz.login.error.{BuiltInErrors, LoginError, LoginException}
 import com.identityblitz.login.method.AuthnMethod
-import scala.collection.immutable.TreeMap
+import com.identityblitz.login.service.ServiceProvider
 import com.identityblitz.login.session.LoginSession
 import com.identityblitz.login.session.LoginSession._
+import com.identityblitz.login.transport.{InboundTransport, OutboundTransport}
+
+import scala.annotation.implicitNotFound
+import scala.collection.immutable.TreeMap
 
 /**
  * Defines a flow of the login process.
@@ -121,7 +121,7 @@ trait LoginFlow extends Handler with WithStart with FlowTools {
    * @param oTr - outbound transport
    */
   final protected def endWithSuccess(implicit iTr: InboundTransport, oTr: OutboundTransport) = {
-    import LoginSession.{getLs, updateLs, lsBuilder, READY}
+    import com.identityblitz.login.session.LoginSession.{READY, getLs, lsBuilder, updateLs}
     val lc = iTr.getLoginCtx.get
     if (logger.isDebugEnabled)
       logger.debug("The login flow is completed successfully [lc = {}].", lc.asString)

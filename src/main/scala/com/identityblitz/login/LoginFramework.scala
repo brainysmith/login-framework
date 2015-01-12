@@ -14,6 +14,10 @@ object LoginFramework {
 
   val logger = LoggerFactory.getLogger("com.identityblitz.login-framework")
 
+  lazy val contextPath: String = confService.getOptString("contextPath").getOrElse("")
+
+  lazy val directRequestEnabled: Boolean = confService.getOptBoolean("directRequestEnabled").getOrElse(false)
+
   lazy val providers: Map[String, Provider] = confService.getDeepMapString("providers").map(t => t._1 -> Handler(t))
 
   private lazy val commandsOptions: Map[String, Map[String,String]] = confService.getDeepMapString("commands")

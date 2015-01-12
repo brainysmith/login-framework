@@ -5,7 +5,7 @@ name := "login-framework"
 
 organization := "com.identityblitz"
 
-version := "0.3.0-SNAPSHOT"
+version := "0.4.0-SNAPSHOT"
 
 licenses := Seq("MIT License" -> url("http://www.opensource.org/licenses/mit-license.php"))
 
