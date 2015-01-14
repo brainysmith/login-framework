@@ -128,7 +128,7 @@ object APController extends Controller {
             throw new IllegalArgumentException("callback_uri is not specified.")
           }(s => s))
           itr.getParameter(FlowAttrName.AUTHN_METHOD_NAME).foreach(itr.setAttribute(FlowAttrName.AUTHN_METHOD_NAME, _))
-          itr.getParameter(FlowAttrName.RELYING_PARTY).foreach(rp => itr.setAttribute(FlowAttrName.RELYING_PARTY, new BuiltInRelyingParty(rp, "DIRECT_REQUEST").asString()))
+          itr.getParameter(FlowAttrName.RELYING_PARTY).foreach(itr.setAttribute(FlowAttrName.RELYING_PARTY, _))
           loginFlow.start
         case Call("logout", null, true) => logoutFlow.start
         case Call("logout", null, false) =>

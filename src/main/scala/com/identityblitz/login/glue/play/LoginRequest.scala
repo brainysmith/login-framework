@@ -1,6 +1,6 @@
 package com.identityblitz.login.glue.play
 
-import com.identityblitz.login.{RelyingParty, FlowAttrName}
+import com.identityblitz.login.FlowAttrName
 import com.identityblitz.login.LoginFramework.logger
 
 trait LoginRequest {
@@ -9,14 +9,14 @@ trait LoginRequest {
 
   def cb: String
 
-  def rp: RelyingParty
+  def rp: String
 
   def am: Option[String]
 
   def toMap = {
     val mMap = scala.collection.mutable.HashMap[String, String](FlowAttrName.CALLBACK_URI_NAME -> this.cb)
     this.am.foreach(method => mMap += (FlowAttrName.AUTHN_METHOD_NAME -> method))
-    mMap += (FlowAttrName.RELYING_PARTY -> rp.asString())
+    mMap += (FlowAttrName.RELYING_PARTY -> rp)
     mMap.toMap
   }
 
@@ -28,7 +28,7 @@ object LoginRequest {
   implicit val refCalls = scala.language.reflectiveCalls
   implicit val postOps =  scala.language.postfixOps
 
-  private case class LoginRequestImpl(cb: String, rp: RelyingParty, am: Option[String]) extends LoginRequest
+  private case class LoginRequestImpl(cb: String, rp: String, am: Option[String]) extends LoginRequest
 
   /**
    * Login request builder
@@ -36,7 +36,7 @@ object LoginRequest {
   abstract class READY
   abstract class NOT_READY
 
-  class LoginRequestBuilder[CB, RP](val callbackUri: String, val relyingParty: RelyingParty, val authnMethod: Option[String]) {
+  class LoginRequestBuilder[CB, RP](val callbackUri: String, val relyingParty: String, val authnMethod: Option[String]) {
 
     def withCallbackUri(cb: String) = {
       require(cb != null && !cb.trim.isEmpty, {
@@ -47,7 +47,7 @@ object LoginRequest {
       new LoginRequestBuilder[READY, RP](cb, relyingParty, authnMethod)
     }
 
-    def withRelyingParty(rp: RelyingParty) = new LoginRequestBuilder[CB, READY](callbackUri, rp, authnMethod)
+    def withRelyingParty(rp: String) = new LoginRequestBuilder[CB, READY](callbackUri, rp, authnMethod)
 
     def withAuthnMethod(am: String) = {
       require(am != null && !am.trim.isEmpty, {
